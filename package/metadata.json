@@ -4,7 +4,7 @@
     "Name": "KRect",
     "Description": "Rectangle-inspired keyboard window placement for Plasma 5.27 and 6",
     "Description[ko]": "Plasma 5.27·6용 단축키 창 배치 — 반쪽, 4분할, 3분할과 화면 이동",
-    "Version": "0.2.0",
+    "Version": "0.3.0",
     "Website": "https://github.com/ziwon/KRect",
     "License": "MIT",
     "Icon": "preferences-system-windows",

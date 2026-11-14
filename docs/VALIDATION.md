@@ -1,9 +1,9 @@
 # Validation notes
 
-Date: 2026-11-14. Release: 0.2.0 desktop app.
-The 0.1.0 sections below retain the historical prototype results.
+Date: 2026-11-15. Release: 0.3.0 snap bar.
+The 0.2.0 and 0.1.0 sections below retain historical validation results.
 
-## Snap bar — unreleased development, 2026-11-15
+## Snap bar 0.3.0 — 2026-11-15
 
 The KWin engine observes real interactive moves and the compositor cursor position.
 The desktop app paints an input-transparent, nonactivating native Qt overlay;
@@ -75,7 +75,7 @@ editor's conflict, swap, and failed-write rollback behavior. Native construction
 smoke checks create every tab and render the app icon without starting KWin.
 Installer tests verify the application launcher, a path containing spaces,
 script-only installation, and removal of the user app.
-The current automated result is **63 passing tests** (45 Node, 18 Python,
+The 0.2.0 automated result was **63 passing tests** (45 Node, 18 Python,
 no skips on this desktop).
 
 Observed on Plasma 5.27.12 / KWin 5.27.11 / Qt 5.15.13 / X11:

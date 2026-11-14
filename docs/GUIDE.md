@@ -41,7 +41,7 @@ Plasma 6에서는 `kpackagetool6`를 사용한다. 두 도구가 모두 설치�
 `bash install.sh --script-only`는 기존처럼 KWin 엔진만 설치한다.
 
 GUI 설치도 가능하다. KWin 스크립트 화면의 **파일에서 설치**로
-`dist/krect-0.2.0.kwinscript`를 선택한 뒤 활성화한다. 이 파일에는 데스크톱 앱이 포함되지 않는다.
+`dist/krect-0.3.0.kwinscript`를 선택한 뒤 활성화한다. 이 파일에는 데스크톱 앱이 포함되지 않는다.
 Git clone으로 가져왔다면 먼저 `python3 tools/build.py`로 이 파일을 생성한다.
 `dist/`의 ZIP과 `.kwinscript` 빌드 결과는 Git에서 추적하지 않는다.
 
@@ -62,9 +62,9 @@ Git clone으로 가져왔다면 먼저 `python3 tools/build.py`로 이 파일을
 KWin 단축키는 계속 작동한다. 배치 기능도 끄려면 먼저 앱의 KRect 버튼을 끈다.
 화면은 시스템 언어에 따라 한국어 또는 영어로 표시한다. `krect --language ko`로 바꿔 실행할 수 있다.
 
-## 상단 드래그 배치 — 개발 버전
+## 상단 드래그 배치
 
-이 기능은 현재 소스에 추가되어 있으며, 배포된 0.2.0에는 포함되지 않는다.
+0.3.0부터 사용할 수 있다. 기존 앱을 종료하고 새 패키지를 설치한 뒤 다시 실행한다.
 
 1. KRect를 켜고 트레이에서 실행해 둔다.
 2. 작업 창의 제목 표시줄을 잡고 **사용할 모니터의 상단 중앙**으로 끈다.
@@ -108,7 +108,7 @@ Plasma 5.27/X11에서 실제 드래그를 확인했으며, Plasma 6/Wayland의 �
 | Cycle repeated half actions | 켬 | 반쪽 단축키의 ½ → ⅔ → ⅓ 순환 |
 | Repeat interval | 1200ms | 같은 창에서 같은 단축키를 반복했다고 판단하는 시간 |
 | Portrait thirds | 켬 | 세로 화면에서 ⅓·⅔ 배치를 위→아래 방향으로 적용 |
-| Snap bar | 켬 | 상단 중앙 드래그 시 배치 막대 표시. KRect 앱 실행 필요, 개발 버전 기능 |
+| Snap bar | 켬 | 상단 중앙 드래그 시 배치 막대 표시. KRect 앱 실행 필요 |
 | Ignored apps | 비어 있음 | 쉼표로 구분한 resource class/name 또는 desktop-file name |
 
 설정 저장 후 KRect를 해제/적용하고 다시 활성화/적용하면 확실하게 다시 읽는다.
@@ -179,7 +179,7 @@ QT_QPA_PLATFORM=offscreen /usr/bin/python3 app/main.py --smoke-test
 `package/contents/code/main.js`는 생성 파일이므로 직접 수정하지 않는다.
 
 다음 검증 범위는 Plasma 6 / Wayland 실기, 물리 키 입력의 충돌과 혼합 배율이다.
-상단 드래그 배치 막대는 개발 버전에 구현했다. 사용자 지정 배치 프리셋은 아직 구현하지 않았다.
+상단 드래그 배치 막대는 0.3.0부터 제공한다. 사용자 지정 배치 프리셋은 아직 구현하지 않았다.
 
 현재 Ubuntu 24.04.5 데스크톱의 Plasma 6 업그레이드 검토는
 [docs/UPGRADE.md](UPGRADE.md)에 있다.
