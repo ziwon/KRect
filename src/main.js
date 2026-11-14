@@ -15,6 +15,7 @@
             registerShortcut: registerShortcut,
             registerUserActionsMenu: registerUserActionsMenu,
             callDBus: typeof callDBus === "function" ? callDBus : null,
+            createTimer: typeof QTimer === "function" ? function () { return new QTimer(); } : null,
             log: function (message) { console.log("KRect: " + message); }
         });
     }
@@ -116,6 +117,32 @@
         }, to);
     }
 
+    function contains(r, p) {
+        return r && p && p.x >= r.x && p.y >= r.y && p.x < r.x + r.width && p.y < r.y + r.height;
+    }
+
+    // The compositor owns these coordinates, including on scaled X11 desktops.
+    // The app paints this same model instead of maintaining a second hit map.
+    function snapLayout(area, portrait) {
+        var groups = [["left", "right"], ["top", "bottom"],
+            ["first-third", "center-third", "last-third"],
+            ["first-two-thirds", "last-third"], ["first-third", "last-two-thirds"],
+            ["top-left", "top-right", "bottom-left", "bottom-right"]];
+        var width = Math.min(648, area.width - 24), height = 120;
+        if (width < 360 || area.height < height + 80) { return null; }
+        var bar = { x: Math.round(area.x + (area.width - width) / 2), y: area.y + 12, width: width, height: height };
+        var cardWidth = (width - 24 - 5 * 12) / 6;
+        var cells = [];
+        groups.forEach(function (actions, group) {
+            var card = { x: 12 + group * (cardWidth + 12), y: 38, width: cardWidth, height: 62 };
+            actions.forEach(function (action) {
+                var f = fractions(action, 0, portrait);
+                cells.push({ action: action, group: group, rect: zone(card, f, 3) });
+            });
+        });
+        return { geometry: bar, cells: cells };
+    }
+
     function start(env) {
         var ws = env.workspace;
         var plasma5 = typeof ws.screens === "undefined";
@@ -124,6 +151,10 @@
         var now = env.now || function () { return Date.now(); };
         var cfg = env.readConfig;
         var lastWindow = null;
+        var drag = null, overlay = null, dragSerial = 0, updatingDrag = false;
+        var snapTimer = env.createTimer && env.callDBus ? env.createTimer() : null;
+        var dropTimer = snapTimer ? env.createTimer() : null;
+        var pendingDrop = null;
 
         function ownWindow(w) {
             return w && [w.resourceClass, w.resourceName, w.desktopFileName].some(function (value) {
@@ -148,7 +179,7 @@
             if (!env.callDBus) { return; }
             var w = appTarget();
             var output = w ? screenFor(w) : null;
-            var status = { protocol: 1, version: "0.2.0", target: w ? {
+            var status = { protocol: 1, version: "0.2.0", snapBar: 1, target: w ? {
                 id: id(w), caption: String(w.caption || w.resourceClass || "Window"),
                 application: String(w.desktopFileName || w.resourceClass || ""),
                 geometry: rect(w.frameGeometry), area: areaFor(output, w), screen: name(output),
@@ -186,6 +217,7 @@
                 cycle: boolean(cfg("CycleHalves", true)),
                 timeout: bounded(cfg("CycleTimeout", 1200), 1200, 200, 5000),
                 portrait: boolean(cfg("PortraitThirds", true)),
+                snapBar: boolean(cfg("SnapBar", true)),
                 ignored: String(cfg("IgnoredApplications", "")).toLowerCase().split(/[,;\n]/).map(function (s) { return s.trim(); }).filter(Boolean)
             };
         }
@@ -194,9 +226,9 @@
         function name(output) { return output ? String(output.name) : ""; }
         function log(message) { if (env.log) { env.log(message); } }
 
-        function eligible(w, opts) {
+        function eligible(w, opts, allowMove) {
             if (!w || ownWindow(w) || w.deleted || !w.managed || !(w.normalWindow || w.dialog) ||
-                    w.fullScreen || w.specialWindow || w.minimized || w.shade || w.move || w.resize ||
+                    w.fullScreen || w.specialWindow || w.minimized || w.shade || (w.move && !allowMove) || w.resize ||
                     !w.moveable || !w.resizeable || !valid(w.frameGeometry)) {
                 return false;
             }
@@ -245,12 +277,148 @@
             return null;
         }
 
+        function sendSnap(payload) {
+            if (env.callDBus) {
+                env.callDBus("org.krect.KRect", "/KRect", "org.krect.KRect", "SnapUpdate", JSON.stringify(payload));
+            }
+        }
+
+        function hideSnap() {
+            if (!drag || !drag.layout) { return; }
+            if (drag.outlined && ws.hideOutline) { ws.hideOutline(); }
+            drag.layout = null; drag.selected = -1; drag.outlined = false;
+            sendSnap({ visible: false });
+        }
+
+        function cancelDrag() {
+            pendingDrop = null;
+            if (dropTimer) { dropTimer.stop(); }
+            hideSnap(); drag = null;
+            if (snapTimer) { snapTimer.stop(); }
+        }
+
+        function positionOverlay() {
+            if (!overlay || !drag || !drag.layout) { return; }
+            overlay.keepAbove = true; overlay.skipTaskbar = true; overlay.skipPager = true;
+            overlay.noBorder = true;
+            if (!near(overlay.frameGeometry, drag.layout.geometry, 1)) {
+                overlay.frameGeometry = rect(drag.layout.geometry);
+            }
+        }
+
+        function updateDrag() {
+            if (!drag || updatingDrag) { return; }
+            updatingDrag = true;
+            try {
+                var opts = settings(), w = drag.window;
+                if (!w.move || !currentContext(w) || !eligible(w, opts, true) || !opts.snapBar) { cancelDrag(); return; }
+                var pointer = ws.cursorPos;
+                var output = screenList().filter(function (s) { return contains(s.geometry, pointer); })[0];
+                var area = output && areaFor(output, w);
+                if (!area || (name(output) !== name(screenFor(w)) && !w.moveableAcrossScreens)) { hideSnap(); return; }
+                var layout = snapLayout(area, opts.portrait && area.height > area.width);
+                if (!layout) { hideSnap(); return; }
+                var g = layout.geometry;
+                var top = Math.min(area.y, output.geometry.y);
+                var activation = { x: g.x, y: top, width: g.width, height: area.y + 28 - top };
+                var retention = { x: g.x - 32, y: Math.min(area.y, output.geometry.y), width: g.width + 64,
+                    height: g.y + g.height + 32 - Math.min(area.y, output.geometry.y) };
+                var retained = drag.layout && drag.output === name(output) && contains(retention, pointer);
+                if (!retained && !contains(activation, pointer)) { hideSnap(); return; }
+                var changed = !drag.layout || drag.output !== name(output) || !near(drag.layout.geometry, g, 0);
+                drag.layout = layout; drag.output = name(output); drag.area = area;
+                positionOverlay();
+                var selected = -1;
+                if (overlay && !overlay.deleted && !overlay.minimized && near(overlay.frameGeometry, g, 1)) {
+                    var local = { x: pointer.x - g.x, y: pointer.y - g.y };
+                    layout.cells.some(function (cell, i) {
+                        if (contains(cell.rect, local)) { selected = i; return true; }
+                        return false;
+                    });
+                }
+                changed = changed || selected !== drag.selected;
+                drag.selected = selected;
+                if (selected !== -1 && ws.showOutline) {
+                    var target = zone(area, fractions(layout.cells[selected].action, 0, opts.portrait && area.height > area.width), opts.gap);
+                    ws.showOutline(target.x, target.y, target.width, target.height);
+                    drag.outlined = true;
+                } else if (drag.outlined && ws.hideOutline) {
+                    ws.hideOutline(); drag.outlined = false;
+                }
+                if (changed || now() - drag.sent >= 500) {
+                    sendSnap({ visible: true, geometry: g, cells: layout.cells, selected: selected });
+                    drag.sent = now();
+                }
+            } catch (error) { log("Snap bar failed: " + String(error)); cancelDrag(); }
+            finally { updatingDrag = false; }
+        }
+
+        function beginDrag(w) {
+            cancelDrag();
+            var opts = settings(), area = areaFor(screenFor(w), w);
+            if (!snapTimer || !opts.snapBar || !w.move || !area || !currentContext(w) || !eligible(w, opts, true)) { return; }
+            drag = { window: w, serial: ++dragSerial, selected: -1, sent: 0,
+                original: { geometry: rect(tracked[id(w)].idleGeometry || w.frameGeometry), area: area,
+                    output: name(screenFor(w)), mode: maxMode(w) } };
+            snapTimer.start(); updateDrag();
+        }
+
+        function finishDrag(w) {
+            var d = drag && drag.window === w ? drag : null;
+            delete states[id(w)];
+            if (!d) { return; }
+            var cell = d.layout && d.layout.cells[d.selected];
+            var g = d.layout && d.layout.geometry, p = ws.cursorPos;
+            var selected = cell && contains(cell.rect, { x: p.x - g.x, y: p.y - g.y });
+            cancelDrag();
+            if (selected) {
+                pendingDrop = { drag: d, action: cell.action };
+                // KWin emits Finished inside a geometry-update blocker. Wait for
+                // cancellation/native tiling to settle before observing the frame.
+                dropTimer.start();
+            }
+            publish();
+        }
+
+        function applyDrop() {
+            var pending = pendingDrop; pendingDrop = null;
+            if (!pending) { return; }
+            var d = pending.drag, w = d.window, opts = settings();
+            if (!tracked[id(w)] || d.serial !== dragSerial || !opts.snapBar || !currentContext(w) || !eligible(w, opts)) { return; }
+            // Both supported KWin APIs restore the initial frame on Esc, but do
+            // not expose the cancel flag to scripts. Be conservative on a no-op.
+            if (near(w.frameGeometry, d.original.geometry, 2) || maxMode(w) || w.tile) { return; }
+            var output = findScreen(d.output), area = output && areaFor(output, w);
+            if (!area || !near(area, d.area, 0)) { return; }
+            var before = rect(w.frameGeometry);
+            var target = zone(area, fractions(pending.action, 0, opts.portrait && area.height > area.width), opts.gap);
+            var state = { original: d.original, last: null };
+            states[id(w)] = state;
+            place(w, target, output);
+            remember(state, pending.action, 0, target, before, output, area);
+            publish();
+        }
+
+        if (snapTimer) {
+            snapTimer.interval = 50;
+            snapTimer.timeout.connect(updateDrag);
+            dropTimer.singleShot = true; dropTimer.interval = 0;
+            dropTimer.timeout.connect(function () {
+                try { applyDrop(); } catch (error) { log("Snap drop failed: " + String(error)); }
+            });
+        }
+
         function watch(w) {
             var key = id(w);
             if (tracked[key]) { return; }
-            tracked[key] = { mode: typeof w.maximizeMode === "number" ? w.maximizeMode : null };
+            tracked[key] = { mode: typeof w.maximizeMode === "number" ? w.maximizeMode : null,
+                idleGeometry: valid(w.frameGeometry) ? rect(w.frameGeometry) : null };
+            if (ownWindow(w) && String(w.caption) === "KRect Snap Bar") { overlay = w; positionOverlay(); }
             if (w.frameGeometryChanged && env.callDBus) {
-                w.frameGeometryChanged.connect(function () { if (lastWindow === w) { publish(); } });
+                w.frameGeometryChanged.connect(function () {
+                    if (tracked[key] && !w.move && !w.resize) { tracked[key].idleGeometry = rect(w.frameGeometry); }
+                    if (lastWindow === w && !w.move && !w.resize) { publish(); }
+                });
             }
             if (w.maximizedAboutToChange) {
                 w.maximizedAboutToChange.connect(function (mode) {
@@ -263,8 +431,12 @@
             }
             var moveFinished = w.interactiveMoveResizeFinished || w.clientFinishUserMovedResized;
             if (moveFinished) {
-                moveFinished.connect(function () { delete states[key]; });
+                moveFinished.connect(function () { finishDrag(w); });
             }
+            var moveStarted = w.interactiveMoveResizeStarted || w.clientStartUserMovedResized;
+            var moveStepped = w.interactiveMoveResizeStepped || w.clientStepUserMovedResized;
+            if (moveStarted) { moveStarted.connect(function () { beginDrag(w); }); }
+            if (moveStepped) { moveStepped.connect(updateDrag); }
         }
 
         function maxMode(w) {
@@ -411,6 +583,8 @@
         var added = ws.windowAdded || ws.clientAdded;
         if (removed) {
             removed.connect(function (w) {
+                if ((drag && drag.window === w) || (pendingDrop && pendingDrop.drag.window === w)) { cancelDrag(); }
+                if (overlay === w) { overlay = null; if (drag) { hideSnap(); } }
                 delete states[id(w)]; delete tracked[id(w)];
                 if (lastWindow === w) { lastWindow = null; publish(); }
             });
@@ -425,8 +599,9 @@
         var activation = ws.windowActivated || ws.clientActivated;
         if (activation) { activation.connect(activated); }
         [ws.currentDesktopChanged, ws.currentActivityChanged, ws.screensChanged, ws.numberScreensChanged].forEach(function (signal) {
-            if (signal && env.callDBus) { signal.connect(function () { publish(); }); }
+            if (signal && env.callDBus) { signal.connect(function () { cancelDrag(); publish(); }); }
         });
+        if (ws.cursorPosChanged && snapTimer) { ws.cursorPosChanged.connect(updateDrag); }
         activated(plasma5 ? ws.activeClient : ws.activeWindow);
 
         ACTIONS.forEach(function (action) {
@@ -450,5 +625,6 @@
         return { execute: safeExecute };
     }
 
-    return { start: start, actions: ACTIONS, rect: rect, zone: zone, fractions: fractions, mapRect: mapRect, near: near };
+    return { start: start, actions: ACTIONS, rect: rect, zone: zone, fractions: fractions, mapRect: mapRect, near: near,
+        snapLayout: snapLayout };
 }));

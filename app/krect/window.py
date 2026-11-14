@@ -304,7 +304,12 @@ class Window(W.QMainWindow):
         self.portrait_thirds = W.QCheckBox(tr("Stack thirds vertically on portrait displays", "세로 모니터에서 3분할을 위아래로 배치"))
         self.portrait_thirds.setChecked(values["PortraitThirds"])
         form.addRow(self.portrait_thirds)
+        self.snap_bar = W.QCheckBox(tr("Show snap layouts when dragging to the top", "창을 화면 상단으로 끌면 배치 막대 표시"))
+        self.snap_bar.setChecked(values["SnapBar"])
+        form.addRow(self.snap_bar)
         box.addLayout(form)
+        box.addWidget(text_label(tr("Drag a window to the top center of a display, move into a region, then release. Move away to continue dragging, or press Esc to cancel. Keep KRect running in the tray for this feature.",
+                                    "창을 화면 상단 중앙으로 끌고, 막대의 원하는 영역에서 놓으세요. 막대를 벗어나면 일반 드래그로 돌아가고 Esc로 취소할 수 있어요. 이 기능은 KRect가 트레이에서 실행 중일 때 작동해요."), True))
         box.addWidget(heading(tr("Excluded applications", "제외할 앱")))
         box.addWidget(text_label(tr("App IDs or window classes, separated by commas or new lines. Fullscreen and fixed-size windows are always skipped.",
                                     "앱 ID나 창 클래스를 쉼표 또는 줄바꿈으로 구분하세요. 전체 화면과 고정 크기 창은 항상 제외돼요."), True))
@@ -452,7 +457,8 @@ class Window(W.QMainWindow):
 
     def save_preferences(self):
         values = dict(Gap=self.gap.value(), CycleHalves=self.cycle.isChecked(), CycleTimeout=self.cycle_timeout.value(),
-                      PortraitThirds=self.portrait_thirds.isChecked(), IgnoredApplications=self.exclusions.toPlainText().strip())
+                      PortraitThirds=self.portrait_thirds.isChecked(), SnapBar=self.snap_bar.isChecked(),
+                      IgnoredApplications=self.exclusions.toPlainText().strip())
         self.perform(lambda: self.backend.save_settings(values, self.autostart.isChecked(), self.close_tray.isChecked()))
 
     def exclude_application(self):

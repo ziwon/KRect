@@ -25,6 +25,7 @@ def main():
             model.LABELS.update({key: model.tr(en, ko) for key, en, ko in model.ACTIONS})
         from krect.backend import Backend, DesktopBridge, SERVICE
         from krect.window import Window
+        from krect.snap import SnapBar
     except ImportError as error:
         print(f"KRect: {error}. Install python3-dbus and python3-pyqt5 (Plasma 5) or python3-pyqt6 (Plasma 6).", file=sys.stderr)
         return 1
@@ -58,6 +59,10 @@ def main():
     try:
         backend = Backend(bridge)
         window = Window(backend, icon)
+        snap_bar = SnapBar()
+        bridge.snap_updated.connect(snap_bar.receive)
+        backend.changed.connect(lambda status: snap_bar.dismiss() if not backend.enabled else None)
+        app.aboutToQuit.connect(snap_bar.dismiss)
         bridge.activated.connect(window.activate)
         window.perform(backend.connect_engine)
     except Exception as error:

@@ -1,5 +1,6 @@
 """KWin and KDE integration. No X11-only window manipulation is used."""
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -17,12 +18,13 @@ SERVICE = "org.krect.KRect"
 DATA = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
 DEFAULTS = {"Gap": 8, "CycleHalves": True, "CycleTimeout": 1200,
-            "PortraitThirds": True, "IgnoredApplications": ""}
+            "PortraitThirds": True, "SnapBar": True, "IgnoredApplications": ""}
 
 
 class DesktopBridge(QtCore.QObject):
     updated = Signal(dict)
     activated = Signal()
+    snap_updated = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -41,6 +43,34 @@ class DesktopBridge(QtCore.QObject):
     def TakeCommand(self):
         command, self.command = self.command, {}
         return json.dumps(command)
+
+    @Slot(str)
+    def SnapUpdate(self, raw):
+        try:
+            model = json.loads(raw)
+            if not isinstance(model, dict):
+                return
+            if model.get("visible"):
+                geometry = model.get("geometry", {})
+                cells = model.get("cells", [])
+                if not all(type(geometry.get(k)) in (int, float) and math.isfinite(geometry[k]) for k in ("x", "y", "width", "height")):
+                    return
+                if not (0 < geometry.get("width", 0) <= 1000 and 0 < geometry.get("height", 0) <= 200):
+                    return
+                if not isinstance(cells, list) or not cells or len(cells) > 20:
+                    return
+                for cell in cells:
+                    r = cell.get("rect", {})
+                    if cell.get("action") not in LABELS or not all(type(r.get(k)) in (int, float) and math.isfinite(r[k]) for k in ("x", "y", "width", "height")):
+                        return
+                    if not (r["x"] >= 0 and r["y"] >= 0 and r["width"] > 0 and r["height"] > 0 and
+                            r["x"] + r["width"] <= geometry["width"] and r["y"] + r["height"] <= geometry["height"]):
+                        return
+                if type(model.get("selected", -1)) is not int or not -1 <= model.get("selected", -1) < len(cells):
+                    return
+            self.snap_updated.emit(model)
+        except (ValueError, TypeError, AttributeError):
+            pass
 
     @Slot()
     def Activate(self):
@@ -159,7 +189,7 @@ class Backend(QtCore.QObject):
                 self.start()
 
     def upgrade_connection(self):
-        if self.enabled and self.status.get("version") != VERSION:
+        if self.enabled and (self.status.get("version") != VERSION or self.status.get("snapBar") != 1):
             try:
                 self.start()
             except Exception as error:

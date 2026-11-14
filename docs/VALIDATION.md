@@ -3,6 +3,64 @@
 Date: 2026-11-14. Release: 0.2.0 desktop app.
 The 0.1.0 sections below retain the historical prototype results.
 
+## Snap bar — unreleased development, 2026-11-15
+
+The KWin engine observes real interactive moves and the compositor cursor position.
+The desktop app paints an input-transparent, nonactivating native Qt overlay;
+KWin positions it, hit-tests its cells and shows the destination outline. The app
+and engine share one cell model. No X11 API is used by the product at runtime.
+The optional live validation tool below uses XTest only to drive its disposable client.
+
+Node tests cover both Plasma signal names, show/preview/drop/restore, Esc after the
+geometry blocker, restored native maximize/tile state with delayed acknowledgements,
+leaving the strip and cell gaps, no app, top panels, portrait transfer, exclusions,
+disabled preferences, stale contexts and small/fractional/negative work areas.
+Qt tests cover bridge validation, painting, nonactivating/input-transparent flags
+and watchdog dismissal when the engine stops. Generated package code is rebuilt
+from `src/main.js`.
+
+Current automated result: **80 passing tests** (59 Node, 21 Python, no skips).
+The 3 overlay tests also passed with Qt 6 in a disposable Ubuntu 26.04 container,
+as did the full native UI construction check. The initial minimal Qt 6 container
+could not render the app's SVG icon, even with `libqt6svg6`. Installing
+`qt6-svg-plugins` supplied `libqsvgicon.so`/`libqsvg.so` and resolved the failure.
+That dependency is now explicit in the Ubuntu 26.04 package and source-install
+instructions. Offscreen tray/raise warnings are expected; these checks do not
+run a compositor or establish Wayland drag behavior.
+
+Observed on the unchanged Plasma 5.27.12 / KWin 5.27.11 / X11 dual-monitor desktop:
+
+- Real title-bar drag → visible bar → left-half drop matched the panel-excluded
+  work area and gap exactly. The temporary work client retained focus, and restore
+  returned to its initial frame.
+- Esc cancelled both a normal and a maximized window drag without snapping.
+- Moving away from the strip hid it and releasing preserved the manually dragged frame.
+- Moving to the portrait display selected a vertical center third, placed it exactly,
+  and restored to the original landscape display.
+- The overlay's actual KWin frame matched the shared hit-test geometry with the
+  desktop's 125% UI font scaling. Captured dark-theme cells received stronger outlines.
+
+The first harness run hit Python D-Bus overload introspection; an explicit `ss`
+signature fixed script loading. An initial synthetic title-bar gesture did not
+start a move; the harness now waits for and checks focus and the setup frame before
+sending input. Subsequent live checks passed. The harness uses an isolated script
+and service, registers no shortcuts, writes no settings, removes its test client
+and script, and restores the pointer and previous focus. Evidence is in ignored
+`dist/snap-validation/results.json` and the adjacent bar captures.
+
+Repeat the live check on a KDE/X11 desktop with a landscape and portrait display:
+
+```bash
+/usr/bin/python3 tools/validate_snap_x11.py
+```
+
+Still pending: an actual Plasma 6/Wayland compositor, mixed Wayland display scales,
+display hotplug during a drag, and applications with restrictive size hints.
+KWin's Finished signal does not expose its cancellation flag. The engine waits for
+the finish geometry blocker and rejects a restored initial frame or native
+maximize/tile state. Wayland cancellation of already tiled/maximized clients
+requires live verification; mocks are not compositor evidence.
+
 ## Desktop app 0.2.0
 
 The app uses native Qt widgets and KWin/KGlobalAccel D-Bus APIs. It does not
