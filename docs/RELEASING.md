@@ -74,6 +74,10 @@ job explicitly installs its tools inside Ubuntu 24.04 instead of assuming a
 GitHub-hosted runner image. Python installer tests run as `nobody` so their
 non-root checks execute inside the validation container.
 
+DinD's default and user-defined bridge MTUs are set to 1280 to match the homelab
+Cilium Pod network. Using Docker's default 1500 caused GitHub HTTPS handshakes
+to time out inside job containers even though Pod-level HTTPS worked.
+
 1. The validation job checks matching versions, all automated tests, shell
    syntax, generated entry-point consistency, and builds the source distributions.
 2. Separate `ubuntu:24.04` and `ubuntu:26.04` containers build `.deb` files,
