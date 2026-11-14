@@ -1,0 +1,18 @@
+{
+  "KPlugin": {
+    "Id": "krect",
+    "Name": "KRect",
+    "Description": "Rectangle-inspired keyboard window placement for Plasma 6",
+    "Description[ko]": "Plasma 6용 단축키 창 배치 — 반쪽, 4분할, 3분할과 화면 이동",
+    "Version": "0.1.0",
+    "Website": "https://github.com/ziwon/KRect",
+    "License": "MIT",
+    "Icon": "preferences-system-windows",
+    "Authors": [{ "Name": "KRect contributors" }],
+    "EnabledByDefault": false
+  },
+  "KPackageStructure": "KWin/Script",
+  "X-Plasma-API": "javascript",
+  "X-Plasma-MainScript": "code/main.js",
+  "X-KDE-ConfigModule": "kwin/effects/configs/kcm_kwin4_genericscripted"
+}

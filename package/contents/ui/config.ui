@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>KRectConfig</class>
+ <widget class="QWidget" name="KRectConfig">
+  <property name="windowTitle"><string>KRect</string></property>
+  <layout class="QVBoxLayout" name="layout">
+   <item><widget class="QLabel" name="intro"><property name="text"><string>KRect — window placement for Plasma 6</string></property></widget></item>
+   <item><layout class="QFormLayout" name="form">
+    <item row="0" column="0"><widget class="QLabel" name="gapLabel"><property name="text"><string>Window gap:</string></property><property name="buddy"><cstring>kcfg_Gap</cstring></property></widget></item>
+    <item row="0" column="1"><widget class="QSpinBox" name="kcfg_Gap"><property name="maximum"><number>64</number></property><property name="suffix"><string> logical px</string></property></widget></item>
+    <item row="1" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_CycleHalves"><property name="text"><string>Repeat half shortcuts to cycle 1/2 → 2/3 → 1/3</string></property></widget></item>
+    <item row="2" column="0"><widget class="QLabel" name="timeoutLabel"><property name="text"><string>Repeat interval:</string></property><property name="buddy"><cstring>kcfg_CycleTimeout</cstring></property></widget></item>
+    <item row="2" column="1"><widget class="QSpinBox" name="kcfg_CycleTimeout"><property name="minimum"><number>200</number></property><property name="maximum"><number>5000</number></property><property name="singleStep"><number>100</number></property><property name="suffix"><string> ms</string></property></widget></item>
+    <item row="3" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_PortraitThirds"><property name="text"><string>Use top / center / bottom thirds on portrait screens</string></property></widget></item>
+    <item row="4" column="0"><widget class="QLabel" name="ignoreLabel"><property name="text"><string>Ignored apps:</string></property><property name="buddy"><cstring>kcfg_IgnoredApplications</cstring></property></widget></item>
+    <item row="4" column="1"><widget class="QLineEdit" name="kcfg_IgnoredApplications"><property name="placeholderText"><string>org.kde.konsole, firefox</string></property></widget></item>
+   </layout></item>
+   <item><widget class="QLabel" name="help"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Change shortcuts in System Settings → Keyboard → Shortcuts; search for KRect. Conflicting defaults need to be reassigned there.
+
+App exclusions match resource class, resource name, or desktop-file name exactly (case-insensitive). Fullscreen and fixed-size windows are skipped.
+
+Apply settings, then turn KRect off and on in KWin Scripts to reload. Maximize uses KDE's native maximization and ignores the gap.</string></property></widget></item>
+   <item><spacer name="spacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
