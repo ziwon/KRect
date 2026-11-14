@@ -41,7 +41,7 @@ Plasma 6에서는 `kpackagetool6`를 사용한다. 두 도구가 모두 설치�
 `bash install.sh --script-only`는 기존처럼 KWin 엔진만 설치한다.
 
 GUI 설치도 가능하다. KWin 스크립트 화면의 **파일에서 설치**로
-`dist/krect-0.3.0.kwinscript`를 선택한 뒤 활성화한다. 이 파일에는 데스크톱 앱이 포함되지 않는다.
+`dist/krect-0.3.1.kwinscript`를 선택한 뒤 활성화한다. 이 파일에는 데스크톱 앱이 포함되지 않는다.
 Git clone으로 가져왔다면 먼저 `python3 tools/build.py`로 이 파일을 생성한다.
 `dist/`의 ZIP과 `.kwinscript` 빌드 결과는 Git에서 추적하지 않는다.
 

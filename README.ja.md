@@ -22,7 +22,7 @@
 
 <p align="center">
   <a href="https://krect.pages.dev/ja/">ウェブサイト</a> ·
-  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">v0.3.0をダウンロード</a>
+  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.1">v0.3.1をダウンロード</a>
 </p>
 
 <p align="center">
@@ -32,6 +32,8 @@
 
 KRectは、ドラッグ、ショートカット、ボタン、トレイメニューで作業中のウィンドウを配置するネイティブQtアプリです。
 既存のKWin上で動作し、KDEの作業領域とグローバルショートカットを使用します。
+
+**0.3.1 更新:** 配置バーが表示されない、または他のウィンドウに隠れる問題を修正しました。[リリースノート](https://github.com/ziwon/KRect/releases/tag/v0.3.1)
 
 ## ドラッグして、選んで、離すだけ
 
@@ -69,20 +71,20 @@ Ubuntu・Kubuntuの**KDE Plasmaセッション**が必要です。GNOMEには対
 
 | 環境 | ダウンロード |
 | --- | --- |
-| Ubuntu 24.04 · Plasma 5.27 · Qt 5 | [24.04用.deb](https://github.com/ziwon/KRect/releases/download/v0.3.0/krect_0.3.0-1ubuntu24.04_all.deb) |
-| Ubuntu 26.04 · Plasma 6 · Qt 6 | [26.04用.deb](https://github.com/ziwon/KRect/releases/download/v0.3.0/krect_0.3.0-1ubuntu26.04_all.deb) |
+| Ubuntu 24.04 · Plasma 5.27 · Qt 5 | [24.04用.deb](https://github.com/ziwon/KRect/releases/download/v0.3.1/krect_0.3.1-1ubuntu24.04_all.deb) |
+| Ubuntu 26.04 · Plasma 6 · Qt 6 | [26.04用.deb](https://github.com/ziwon/KRect/releases/download/v0.3.1/krect_0.3.1-1ubuntu26.04_all.deb) |
 
 ダウンロードしたフォルダーで実行します。26.04では対応するファイル名に置き換えてください。
 
 ```bash
-sudo apt install ./krect_0.3.0-1ubuntu24.04_all.deb
+sudo apt install ./krect_0.3.1-1ubuntu24.04_all.deb
 ```
 
 アプリ、ランチャー、トレイ、KWinエンジンがインストールされます。
 ソースからインストールしていた場合は、アプリを終了し、ソースフォルダーの`bash uninstall.sh`でユーザー用コピーを先に削除してください。
 既存のシステムパッケージを更新する場合は、トレイからKRectを終了して上のコマンドを実行し、アプリを開き直してください。
 
-[全リリースファイルとチェックサム](https://github.com/ziwon/KRect/releases/tag/v0.3.0) · [ソースからのインストールガイド（韓国語）](docs/GUIDE.md#소스에서-설치)
+[全リリースファイルとチェックサム](https://github.com/ziwon/KRect/releases/tag/v0.3.1) · [ソースからのインストールガイド（韓国語）](docs/GUIDE.md#소스에서-설치)
 
 ## 使い始める
 
@@ -110,7 +112,7 @@ KRectは最後に選択した作業ウィンドウを記憶し、自身のウィ
 
 ## 対応環境と検証範囲
 
-0.3.0は**80の自動テスト**と、**Plasma 5.27 / X11のドラッグ配置に関する5つの実機シナリオ**を通過しました。
+0.3.1は**82の自動テスト**と、**Plasma 5.27 / X11のドラッグ配置に関する6つの実機シナリオ**を通過しました。
 Ubuntu 24.04・26.04のコンテナーで、パッケージのインストール・削除とQt 5/6のUI生成も確認しています。
 **Plasma 6 / Waylandの実機、異なる表示倍率の併用、物理キー入力、ログイン時の自動起動は追加検証が必要です。**
 

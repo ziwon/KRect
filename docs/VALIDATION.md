@@ -1,7 +1,56 @@
 # Validation notes
 
-Date: 2026-11-15. Release: 0.3.0 snap bar.
-The 0.2.0 and 0.1.0 sections below retain historical validation results.
+Date: 2026-11-15. Release: 0.3.1 snap bar visibility and stacking fixes.
+Older release sections below retain their historical results and limitations.
+
+## Snap bar 0.3.1
+
+Three integration problems caused the 0.3.0 bar to disappear or sit behind the
+window being dragged. Qt appended the application display name to the native
+caption, so the engine did not recognize or position the overlay. KWin hid the
+`Qt.Tool` overlay while another application's window was active. Finally, another
+always-on-top window could stack above the bar. The engine now recognizes both
+native title forms, the app uses a nonactivating normal window, and visible
+updates raise the overlay on X11. Plasma 6 uses `workspace.raiseWindow` without
+activating it. Input remains transparent and the target's keep-above setting is
+unchanged.
+
+The original isolated live harness had neither the production application display
+name nor a main application window. Qt visibility and correct frame geometry
+therefore missed both native title handling and KWin utility-window hiding. The
+harness now includes both, checks `_NET_WM_STATE_HIDDEN` and native stacking order,
+and exercises an always-on-top work window. A widget-only image is not evidence
+of compositor visibility.
+
+Release checks on this source passed **82 automated tests** (61 Node, 21 Python,
+no skips), generated-package consistency, shell syntax, the desktop entry, the
+three-language static site build, and Qt 5 native UI construction. The offscreen
+platform emitted its expected system-tray signal warning; construction completed.
+
+The updated live harness passed **six scenarios** on Plasma 5.27/X11: landscape
+placement with exact gaps/focus/restore, Esc from normal and maximized windows,
+leaving the strip, portrait transfer with vertical thirds, and placement/restore
+of an always-on-top window. Every visible-bar check also verified native hidden
+state and stacking above the target. The previously running KRect app/engine were
+restored after the isolated run. Evidence is in ignored `dist/snap-validation/`
+and `dist/release-validation/live-snap.log` in the release checkout.
+
+The tag workflow separately builds and installs/removes Ubuntu 24.04 and 26.04
+packages with their real Qt 5/6 dependencies. Check its completed jobs for package
+results; these container checks are not a live Plasma 6/Wayland session.
+
+Earlier targeted checks on Plasma 5.27.12 / KWin 5.27.11 / X11 reproduced the failures
+with the installed app and confirmed both monitor orientations, focus preservation,
+exact left-half placement and visibility after the fixes. A cropped screen image
+confirmed the bar above an always-on-top disposable client. A real Dolphin window
+also placed correctly, and the user confirmed manual drag placement after snapfix2.
+One held-drag attempt interrupted around a portal screenshot failed its final
+geometry assertion; that attempt is not counted as a passing check.
+
+Still pending: a real Plasma 6/Wayland compositor, mixed display scales, display
+hotplug during a drag, and applications with restrictive size hints. Container
+package and Qt 6 construction checks do not establish Wayland stacking behavior.
+Screenshot capture is not included in 0.3.1.
 
 ## Snap bar 0.3.0 — 2026-11-15
 
@@ -19,7 +68,7 @@ Qt tests cover bridge validation, painting, nonactivating/input-transparent flag
 and watchdog dismissal when the engine stops. Generated package code is rebuilt
 from `src/main.js`.
 
-Current automated result: **80 passing tests** (59 Node, 21 Python, no skips).
+0.3.0 automated result: **80 passing tests** (59 Node, 21 Python, no skips).
 The 3 overlay tests also passed with Qt 6 in a disposable Ubuntu 26.04 container,
 as did the full native UI construction check. The initial minimal Qt 6 container
 could not render the app's SVG icon, even with `libqt6svg6`. Installing

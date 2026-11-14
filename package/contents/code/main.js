@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * KRect 0.3.0 — window placement for KWin / Plasma 5.27 and 6.
+ * KRect 0.3.1 — window placement for KWin / Plasma 5.27 and 6.
  * This file is both the KWin entry point and a dependency-free Node test module.
  */
 (function (root, factory) {
@@ -179,7 +179,7 @@
             if (!env.callDBus) { return; }
             var w = appTarget();
             var output = w ? screenFor(w) : null;
-            var status = { protocol: 1, version: "0.3.0", snapBar: 1, target: w ? {
+            var status = { protocol: 1, version: "0.3.1", snapBar: 1, target: w ? {
                 id: id(w), caption: String(w.caption || w.resourceClass || "Window"),
                 application: String(w.desktopFileName || w.resourceClass || ""),
                 geometry: rect(w.frameGeometry), area: areaFor(output, w), screen: name(output),

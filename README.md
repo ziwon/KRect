@@ -22,7 +22,7 @@
 
 <p align="center">
   <a href="https://krect.pages.dev/">웹사이트</a> ·
-  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">v0.3.0 다운로드</a>
+  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.1">v0.3.1 다운로드</a>
 </p>
 
 <p align="center">
@@ -32,6 +32,8 @@
 
 KRect는 드래그, 단축키, 앱 버튼, 트레이 메뉴로 작업 중인 창을 배치하는 네이티브 Qt 앱입니다.
 기존 KWin 위에서 동작하며 KDE의 작업 영역과 전역 단축키를 사용합니다.
+
+**0.3.1 업데이트:** 배치 막대가 숨거나 다른 창 뒤에 가려지는 문제를 수정했습니다. [릴리즈 노트](https://github.com/ziwon/KRect/releases/tag/v0.3.1)
 
 ## 끌어서 고르고, 놓으면 끝
 
@@ -69,20 +71,20 @@ Ubuntu·Kubuntu의 **KDE Plasma 세션**이 필요합니다. GNOME에서는 동�
 
 | 환경 | 다운로드 |
 | --- | --- |
-| Ubuntu 24.04 · Plasma 5.27 · Qt 5 | [24.04용 .deb](https://github.com/ziwon/KRect/releases/download/v0.3.0/krect_0.3.0-1ubuntu24.04_all.deb) |
-| Ubuntu 26.04 · Plasma 6 · Qt 6 | [26.04용 .deb](https://github.com/ziwon/KRect/releases/download/v0.3.0/krect_0.3.0-1ubuntu26.04_all.deb) |
+| Ubuntu 24.04 · Plasma 5.27 · Qt 5 | [24.04용 .deb](https://github.com/ziwon/KRect/releases/download/v0.3.1/krect_0.3.1-1ubuntu24.04_all.deb) |
+| Ubuntu 26.04 · Plasma 6 · Qt 6 | [26.04용 .deb](https://github.com/ziwon/KRect/releases/download/v0.3.1/krect_0.3.1-1ubuntu26.04_all.deb) |
 
 다운로드한 폴더에서 실행하세요. 26.04에서는 해당 파일명으로 바꿉니다.
 
 ```bash
-sudo apt install ./krect_0.3.0-1ubuntu24.04_all.deb
+sudo apt install ./krect_0.3.1-1ubuntu24.04_all.deb
 ```
 
 앱, 실행기, 트레이와 KWin 엔진을 함께 설치합니다.
 기존에 소스로 설치했다면 앱을 종료하고 소스 폴더에서 `bash uninstall.sh`로 사용자 설치를 제거한 뒤 진행하세요.
 기존 시스템 패키지는 트레이 메뉴에서 KRect를 종료한 뒤 위 명령으로 업데이트하고 앱을 다시 실행하세요.
 
-[소스 설치·업데이트·제거](docs/GUIDE.md#소스에서-설치) · [전체 릴리즈 파일과 체크섬](https://github.com/ziwon/KRect/releases/tag/v0.3.0)
+[소스 설치·업데이트·제거](docs/GUIDE.md#소스에서-설치) · [전체 릴리즈 파일과 체크섬](https://github.com/ziwon/KRect/releases/tag/v0.3.1)
 
 ## 시작하기
 
@@ -109,7 +111,7 @@ KRect는 마지막으로 선택한 작업 창을 기억합니다. KRect 자신�
 
 ## 지원 범위
 
-0.3.0은 자동 테스트 **80개**와 **Plasma 5.27 / X11의 드래그 배치 실기 5개 시나리오**를 통과했습니다.
+0.3.1은 자동 테스트 **82개**와 **Plasma 5.27 / X11의 드래그 배치 실기 6개 시나리오**를 통과했습니다.
 Ubuntu 24.04·26.04 컨테이너에서 패키지 설치·제거와 Qt 5/6 화면 생성도 확인했습니다.
 **Plasma 6 / Wayland 실기, 혼합 배율, 물리 단축키 입력과 로그인 자동 시작은 추가 검증이 필요합니다.**
 

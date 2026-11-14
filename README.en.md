@@ -22,7 +22,7 @@
 
 <p align="center">
   <a href="https://krect.pages.dev/en/">Website</a> ·
-  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">Download v0.3.0</a>
+  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.1">Download v0.3.1</a>
 </p>
 
 <p align="center">
@@ -32,6 +32,8 @@
 
 KRect is a native Qt app that arranges your work windows by dragging or through shortcuts, buttons, and a tray menu.
 It works with your existing KWin session, using KDE's work areas and global shortcuts.
+
+**0.3.1 update:** fixes snap bars that disappear or become covered by other windows. [Release notes](https://github.com/ziwon/KRect/releases/tag/v0.3.1)
 
 ## Drag, choose, and drop
 
@@ -69,20 +71,20 @@ Check `plasmashell --version`, then choose your package.
 
 | Environment | Download |
 | --- | --- |
-| Ubuntu 24.04 · Plasma 5.27 · Qt 5 | [.deb for 24.04](https://github.com/ziwon/KRect/releases/download/v0.3.0/krect_0.3.0-1ubuntu24.04_all.deb) |
-| Ubuntu 26.04 · Plasma 6 · Qt 6 | [.deb for 26.04](https://github.com/ziwon/KRect/releases/download/v0.3.0/krect_0.3.0-1ubuntu26.04_all.deb) |
+| Ubuntu 24.04 · Plasma 5.27 · Qt 5 | [.deb for 24.04](https://github.com/ziwon/KRect/releases/download/v0.3.1/krect_0.3.1-1ubuntu24.04_all.deb) |
+| Ubuntu 26.04 · Plasma 6 · Qt 6 | [.deb for 26.04](https://github.com/ziwon/KRect/releases/download/v0.3.1/krect_0.3.1-1ubuntu26.04_all.deb) |
 
 Run this in your download folder. On 26.04, substitute the matching filename.
 
 ```bash
-sudo apt install ./krect_0.3.0-1ubuntu24.04_all.deb
+sudo apt install ./krect_0.3.1-1ubuntu24.04_all.deb
 ```
 
 This installs the app, launcher, tray, and KWin engine.
 If you previously installed from source, quit the app and run `bash uninstall.sh` in that source folder to remove the user installation first.
 For an existing system package, quit KRect from the tray, run the command above, and reopen the app.
 
-[All release files and checksums](https://github.com/ziwon/KRect/releases/tag/v0.3.0) · [Source installation guide (Korean)](docs/GUIDE.md#소스에서-설치)
+[All release files and checksums](https://github.com/ziwon/KRect/releases/tag/v0.3.1) · [Source installation guide (Korean)](docs/GUIDE.md#소스에서-설치)
 
 ## Get started
 
@@ -109,7 +111,7 @@ Existing KDE shortcuts are never forcibly overwritten. All 18 actions are listed
 
 ## Compatibility
 
-Version 0.3.0 passed **80 automated tests** and **5 live drag-layout scenarios on Plasma 5.27 / X11**.
+Version 0.3.1 passed **82 automated tests** and **6 live drag-layout scenarios on Plasma 5.27 / X11**.
 Package installation, removal, and Qt 5/6 UI construction were also checked in Ubuntu 24.04 and 26.04 containers.
 **Live Plasma 6 / Wayland sessions, mixed scaling, physical shortcut input, and login autostart still need validation.**
 

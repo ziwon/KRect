@@ -2,11 +2,11 @@
 
 ## Outputs
 
-For version `0.3.0`, the release workflow produces:
+For version `0.3.1`, the release workflow produces:
 
-- `krect_0.3.0-1ubuntu24.04_all.deb`: Plasma 5.27, PyQt 5, `kpackagetool5`.
-- `krect_0.3.0-1ubuntu26.04_all.deb`: Plasma 6, PyQt 6, `kpackagetool6`.
-- `krect-0.3.0.kwinscript` (engine only) and `krect-0.3.0.zip` (full source).
+- `krect_0.3.1-1ubuntu24.04_all.deb`: Plasma 5.27, PyQt 5, `kpackagetool5`.
+- `krect_0.3.1-1ubuntu26.04_all.deb`: Plasma 6, PyQt 6, `kpackagetool6`.
+- `krect-0.3.1.kwinscript` (engine only) and `krect-0.3.1.zip` (full source).
 - `SHA256SUMS` covering those four files.
 
 Both Debian packages contain architecture-independent Python/JavaScript/UI/data.
@@ -32,7 +32,7 @@ Python 3, python3-dbus and PyQt 5/6 packages.
 python3 tools/build.py
 python3 tools/build_deb.py --ubuntu 24.04
 python3 tools/build_deb.py --ubuntu 26.04
-dpkg-deb --info dist/krect_0.3.0-1ubuntu24.04_all.deb
+dpkg-deb --info dist/krect_0.3.1-1ubuntu24.04_all.deb
 ```
 
 `SOURCE_DATE_EPOCH` controls package timestamps. Identical source, toolchain,
@@ -108,13 +108,13 @@ Write release notes in `docs/releases/<version>.md` with Korean first and Englis
 second. Keep the changes, installation instructions, and validation limits aligned
 in both languages; a shared download table can follow them. The workflow uses
 that file when creating the GitHub Release and fails if it is missing. Reruns
-leave an existing release description intact. See [0.3.0](releases/0.3.0.md) for
+leave an existing release description intact. See [0.3.1](releases/0.3.1.md) for
 the format.
 
 ```bash
 git push origin main
-git tag -a v0.3.0 -m 'KRect 0.3.0'
-git push origin v0.3.0
+git tag -a v0.3.1 -m 'KRect 0.3.1'
+git push origin v0.3.1
 ```
 
 Inspect the Actions run and the release assets before sharing the release.
