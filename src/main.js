@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * KRect 0.1.0 — keyboard-driven window placement for KWin / Plasma 6.
+ * KRect 0.1.0 — keyboard-driven window placement for KWin / Plasma 5.27 and 6.
  * This file is both the KWin entry point and a dependency-free Node test module.
  */
 (function (root, factory) {
@@ -117,6 +117,7 @@
 
     function start(env) {
         var ws = env.workspace;
+        var plasma5 = typeof ws.screens === "undefined";
         var states = Object.create(null);
         var tracked = Object.create(null);
         var now = env.now || function () { return Date.now(); };
@@ -149,15 +150,34 @@
         }
 
         function areaFor(output, w) {
-            var area = output ? ws.clientArea(env.KWin.MaximizeArea, output, ws.currentDesktop) :
+            var area = output ? ws.clientArea(env.KWin.MaximizeArea, plasma5 ? output.index : output, ws.currentDesktop) :
                 ws.clientArea(env.KWin.MaximizeArea, w);
             return valid(area) ? rect(area) : null;
         }
 
         function screenList() {
-            return Array.prototype.slice.call(ws.screens).sort(function (a, b) {
+            var screens = [];
+            if (plasma5) {
+                for (var i = 0; i < ws.numScreens; i++) {
+                    var geometry = rect(ws.clientArea(env.KWin.ScreenArea, i, ws.currentDesktop));
+                    screens.push({ index: i, geometry: geometry,
+                        name: "geometry:" + [geometry.x, geometry.y, geometry.width, geometry.height].join(",") });
+                }
+            } else {
+                screens = Array.prototype.slice.call(ws.screens);
+            }
+            return screens.sort(function (a, b) {
                 return a.geometry.x - b.geometry.x || a.geometry.y - b.geometry.y || name(a).localeCompare(name(b));
             });
+        }
+
+        function screenFor(w) {
+            if (!plasma5) { return w.output || ws.activeScreen; }
+            var screens = screenList();
+            for (var i = 0; i < screens.length; i++) {
+                if (screens[i].index === w.screen) { return screens[i]; }
+            }
+            return null;
         }
 
         function findScreen(outputName) {
@@ -176,9 +196,14 @@
                 w.maximizedAboutToChange.connect(function (mode) {
                     if (tracked[key]) { tracked[key].mode = Number(mode); }
                 });
+            } else if (w.clientMaximizedStateAboutToChange) {
+                w.clientMaximizedStateAboutToChange.connect(function (client, mode) {
+                    if (tracked[key]) { tracked[key].mode = Number(mode); }
+                });
             }
-            if (w.interactiveMoveResizeFinished) {
-                w.interactiveMoveResizeFinished.connect(function () { delete states[key]; });
+            var moveFinished = w.interactiveMoveResizeFinished || w.clientFinishUserMovedResized;
+            if (moveFinished) {
+                moveFinished.connect(function () { delete states[key]; });
             }
         }
 
@@ -190,7 +215,7 @@
             var key = id(w);
             if (!states[key]) {
                 states[key] = {
-                    original: { geometry: rect(w.frameGeometry), area: rect(area), output: name(w.output), mode: maxMode(w) },
+                    original: { geometry: rect(w.frameGeometry), area: rect(area), output: name(screenFor(w)), mode: maxMode(w) },
                     last: null
                 };
             }
@@ -211,7 +236,9 @@
         function place(w, geometry, output) {
             w.setMaximize(false, false);
             detachTile(w);
-            if (output && name(output) !== name(w.output)) { ws.sendClientToScreen(w, output); }
+            if (output && name(output) !== name(screenFor(w))) {
+                ws.sendClientToScreen(w, plasma5 ? output.index : output);
+            }
             w.frameGeometry = geometry;
         }
 
@@ -227,10 +254,10 @@
 
         function execute(action, explicitWindow) {
             var opts = settings();
-            var w = explicitWindow || ws.activeWindow;
+            var w = explicitWindow || (plasma5 ? ws.activeClient : ws.activeWindow);
             if (!eligible(w, opts)) { return false; }
             watch(w);
-            var output = w.output || ws.activeScreen;
+            var output = screenFor(w);
             var area = areaFor(output, w);
             if (!area) { return false; }
             var key = id(w), state = states[key], target, before, last, dest;
@@ -320,11 +347,13 @@
             catch (error) { log(action + " failed: " + String(error)); return false; }
         }
 
-        if (ws.windowRemoved) {
-            ws.windowRemoved.connect(function (w) { delete states[id(w)]; delete tracked[id(w)]; });
+        var removed = ws.windowRemoved || ws.clientRemoved;
+        var added = ws.windowAdded || ws.clientAdded;
+        if (removed) {
+            removed.connect(function (w) { delete states[id(w)]; delete tracked[id(w)]; });
         }
-        if (ws.windowAdded) { ws.windowAdded.connect(watch); }
-        Array.prototype.forEach.call(ws.stackingOrder || [], watch);
+        if (added) { added.connect(watch); }
+        Array.prototype.forEach.call(plasma5 ? ws.clientList() : (ws.stackingOrder || []), watch);
 
         ACTIONS.forEach(function (action) {
             if (env.registerShortcut("KRect-" + action[0], "KRect: " + action[1], action[2], function () {
