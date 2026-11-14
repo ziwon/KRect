@@ -48,6 +48,20 @@ The Debian tests inspect actual archives and check repeat-build equality.
 manual dispatch, and `v*` tag pushes. Ordinary builds upload Actions artifacts;
 only a tag push publishes a GitHub Release.
 
+Like `ziwon/bluesify`, all jobs use a repository-scoped homelab ARC scale set,
+named `krect`. GitHub-hosted runner minutes are not used. The existing `bluesify`
+scale set is registered only to that repository and cannot run KRect jobs.
+The scale set is managed in `ziwon/homelab`'s
+`platform/stacks/01-platforms/overlays/home/arc.yaml` through Argo CD. A reference
+copy is [ci/arc-krect.yaml](ci/arc-krect.yaml). Without this scale set jobs queue.
+
+KRect needs Docker-in-Docker for its Ubuntu job containers. The template follows
+the existing homelab DinD runner pattern, scales from zero to one runner, bounds
+scratch storage, and grants no additional cluster RBAC. Each validation/release
+job explicitly installs its tools inside Ubuntu 24.04 instead of assuming a
+GitHub-hosted runner image. Python installer tests run as `nobody` so their
+non-root checks execute inside the validation container.
+
 1. The validation job checks matching versions, all automated tests, shell
    syntax, generated entry-point consistency, and builds the source distributions.
 2. Separate `ubuntu:24.04` and `ubuntu:26.04` containers build `.deb` files,

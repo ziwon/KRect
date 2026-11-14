@@ -12,9 +12,18 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-24.04
+    # Repository-scoped homelab ARC scale set, following ziwon/bluesify.
+    runs-on: krect
+    container: ubuntu:24.04
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     steps:
+      - name: Install validation tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3 dpkg util-linux
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -37,7 +46,8 @@ jobs:
       - name: Test and build distributions
         run: |
           node --test tests/*.test.cjs
-          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          # Installer tests must run as a desktop user, not container root.
+          runuser -u nobody -- python3 -m unittest discover -s tests -p 'test_*.py' -v
           bash -n install.sh uninstall.sh tools/plasma-tools.sh tools/smoke-deb.sh
           python3 tools/build.py
           git diff --exit-code -- package/contents/code/main.js
@@ -51,7 +61,7 @@ jobs:
 
   deb:
     needs: validate
-    runs-on: ubuntu-24.04
+    runs-on: krect
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -92,11 +102,16 @@ jobs:
   release:
     if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: [validate, deb]
-    runs-on: ubuntu-24.04
+    runs-on: krect
+    container: ubuntu:24.04
     timeout-minutes: 5
     permissions:
       contents: write
     steps:
+      - name: Install release tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates gh
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
