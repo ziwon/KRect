@@ -115,7 +115,8 @@ jobs:
       - name: Install release tools
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates gh
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git gh
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
@@ -127,8 +128,10 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           cd dist
+          notes_file="../docs/releases/${RELEASE_TAG#v}.md"
+          test -f "$notes_file" || { echo "Missing bilingual release notes: $notes_file" >&2; exit 1; }
           sha256sum -- *.deb *.kwinscript *.zip > SHA256SUMS
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --verify-tag --generate-notes --title "KRect $RELEASE_TAG"
+            gh release create "$RELEASE_TAG" --verify-tag --notes-file "$notes_file" --title "KRect $RELEASE_TAG"
           fi
           gh release upload "$RELEASE_TAG" --clobber -- *.deb *.kwinscript *.zip SHA256SUMS

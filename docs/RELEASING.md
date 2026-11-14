@@ -104,6 +104,13 @@ Set the same numeric `major.minor.patch` version in `package/metadata.json`,
 in `src/main.js`. Rebuild and commit the generated entry point and release changes.
 The tag must exactly match `v` plus that version; a mismatch fails validation.
 
+Write release notes in `docs/releases/<version>.md` with Korean first and English
+second. Keep the changes, installation instructions, and validation limits aligned
+in both languages; a shared download table can follow them. The workflow uses
+that file when creating the GitHub Release and fails if it is missing. Reruns
+leave an existing release description intact. See [0.2.0](releases/0.2.0.md) for
+the format.
+
 ```bash
 git push origin main
 git tag -a v0.2.0 -m 'KRect 0.2.0'
