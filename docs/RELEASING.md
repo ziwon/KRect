@@ -67,7 +67,9 @@ GitHub CLI OAuth token cannot change this installation's repository selection
 
 KRect needs Docker-in-Docker for its Ubuntu job containers. The template follows
 the existing homelab DinD runner pattern, scales from zero to one runner, bounds
-scratch storage, and grants no additional cluster RBAC. Each validation/release
+scratch storage, copies the runner's action runtimes into a shared DinD volume,
+and grants no additional cluster RBAC. The runtime volume is required for
+JavaScript actions such as checkout inside job containers. Each validation/release
 job explicitly installs its tools inside Ubuntu 24.04 instead of assuming a
 GitHub-hosted runner image. Python installer tests run as `nobody` so their
 non-root checks execute inside the validation container.
