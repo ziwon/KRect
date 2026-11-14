@@ -2,15 +2,16 @@
 
 ## Outputs
 
-For version `0.1.0`, the release workflow produces:
+For version `0.2.0`, the release workflow produces:
 
-- `krect_0.1.0-1ubuntu24.04_all.deb`: Plasma 5.27, `kpackagetool5`.
-- `krect_0.1.0-1ubuntu26.04_all.deb`: Plasma 6, `kpackagetool6`.
-- `krect-0.1.0.kwinscript` and `krect-0.1.0.zip`.
+- `krect_0.2.0-1ubuntu24.04_all.deb`: Plasma 5.27, PyQt 5, `kpackagetool5`.
+- `krect_0.2.0-1ubuntu26.04_all.deb`: Plasma 6, PyQt 6, `kpackagetool6`.
+- `krect-0.2.0.kwinscript` (engine only) and `krect-0.2.0.zip` (full source).
 - `SHA256SUMS` covering those four files.
 
-Both Debian packages are architecture-independent JavaScript/UI/data packages.
-They install to `/usr/share/kwin/scripts/krect`. Their dependencies constrain
+Both Debian packages contain architecture-independent Python/JavaScript/UI/data.
+They install the app, launcher, desktop entry, icon and manual alongside the
+engine at `/usr/share/kwin/scripts/krect`. Their dependencies constrain
 `kwin-common` and `plasma-workspace` to the target Plasma generation, including
 Ubuntu's `4:` package-version epoch. An Ubuntu release upgrade may remove the
 old KRect package to satisfy those constraints; install the matching package
@@ -24,13 +25,14 @@ KRect or log out/in after updating or removing a running script.
 ## Local builds
 
 Use Python 3.9+ and `dpkg-deb` (provided by `dpkg`). No Node/Python runtime is
-needed by the installed KWin script.
+needed by the installed KWin script. The desktop app uses the distribution's
+Python 3, python3-dbus and PyQt 5/6 packages.
 
 ```bash
 python3 tools/build.py
 python3 tools/build_deb.py --ubuntu 24.04
 python3 tools/build_deb.py --ubuntu 26.04
-dpkg-deb --info dist/krect_0.1.0-1ubuntu24.04_all.deb
+dpkg-deb --info dist/krect_0.2.0-1ubuntu24.04_all.deb
 ```
 
 `SOURCE_DATE_EPOCH` controls package timestamps. Identical source, toolchain,
@@ -82,7 +84,8 @@ to time out inside job containers even though Pod-level HTTPS worked.
    syntax, generated entry-point consistency, and builds the source distributions.
 2. Separate `ubuntu:24.04` and `ubuntu:26.04` containers build `.deb` files,
    run Lintian (errors fail the job), install real runtime dependencies and the
-   package, check global KPackage discovery and source equality, and remove it.
+   package, check global KPackage discovery, source equality, desktop entry,
+   version and native offscreen UI construction, then remove it.
 3. After all jobs pass for a version tag, the release job creates the release,
    generates checksums, and uploads the assets. Only this job receives
    `contents: write`. Reruns replace the same assets instead of creating duplicates.
@@ -96,14 +99,15 @@ publication uses the workflow's `GITHUB_TOKEN`.
 
 ## Publish a version
 
-Set the same numeric `major.minor.patch` version in `package/metadata.json` and
-`package.json`. Rebuild and commit the generated entry point and release changes.
+Set the same numeric `major.minor.patch` version in `package/metadata.json`,
+`package.json`, and `app/krect/__init__.py`. Update the engine's published version
+in `src/main.js`. Rebuild and commit the generated entry point and release changes.
 The tag must exactly match `v` plus that version; a mismatch fails validation.
 
 ```bash
 git push origin main
-git tag -a v0.1.0 -m 'KRect 0.1.0'
-git push origin v0.1.0
+git tag -a v0.2.0 -m 'KRect 0.2.0'
+git push origin v0.2.0
 ```
 
 Inspect the Actions run and the release assets before sharing the release.

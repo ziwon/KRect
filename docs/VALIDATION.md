@@ -1,6 +1,76 @@
 # Validation notes
 
-Date: 2026-11-14. Release: 0.1.0 prototype.
+Date: 2026-11-14. Release: 0.2.0 desktop app.
+The 0.1.0 sections below retain the historical prototype results.
+
+## Desktop app 0.2.0
+
+The app uses native Qt widgets and KWin/KGlobalAccel D-Bus APIs. It does not
+use X11 window IDs, wmctrl or simulated keystrokes at runtime. KWin remembers
+the last eligible external window; the app sends its expected window identity
+with every command. A changed/closed/excluded target, another desktop/activity,
+and KRect's own windows cannot receive a stale layout command. The two monitors
+and scaling of the preflight below are unchanged.
+
+Automated coverage adds the app bridge's targeting rules and the shortcut
+editor's conflict, swap, and failed-write rollback behavior. Native construction
+smoke checks create every tab and render the app icon without starting KWin.
+Installer tests verify the application launcher, a path containing spaces,
+script-only installation, and removal of the user app.
+The current automated result is **63 passing tests** (45 Node, 18 Python,
+no skips on this desktop).
+
+Observed on Plasma 5.27.12 / KWin 5.27.11 / Qt 5.15.13 / X11:
+
+- **14 live checks passed** using a dedicated temporary Qt client. App buttons
+  and tray actions placed/restored that client while the KRect window remained
+  unchanged. Landscape-to-portrait transfer and vertical center-third placement
+  used the actual panel-excluded work areas.
+- Native maximization, left placement, and restore preserved both X11 maximize
+  flags. The Plasma 5 adapter now observes the workspace's boolean
+  `clientMaximizeSet` signal; the former enum signal was insufficient on this
+  desktop. Windows maximized before engine startup remain subject to the
+  older-API limitation described below.
+- The KDE shortcut service accepted a temporary unused binding and restored the
+  original bindings. An Alt+F4 conflict was rejected before any change.
+- Gap 12 was written to KConfig and verified against actual window geometry,
+  then the original preferences were restored. The first attempt exposed KWin's
+  cached configuration: restarting the script alone still used gap 8. The app
+  now requests KWin reconfiguration before reloading its engine.
+- A second application launch activated the existing instance and exited
+  successfully. KDE reported a system tray available. All three tabs were
+  captured with the system's dark theme and 125% UI scaling. An initial fixed
+  layout overlapped buttons; scrollable content now keeps controls separated.
+- An initial self-resize assertion sampled a not-yet-mapped app window before
+  KWin added its decorations. Waiting for exposure and comparing the app's client
+  size removed that test-harness false positive.
+
+Local evidence is in ignored `dist/desktop-validation/results.json` and the
+adjacent screenshots. Live checks changed only the temporary client, restored
+shortcut bindings and placement preferences, and did not alter monitor settings.
+
+Repeatable automated checks:
+
+```bash
+node --test tests/*.test.cjs
+/usr/bin/python3 -m unittest discover -s tests -p 'test_*.py' -v
+QT_QPA_PLATFORM=offscreen /usr/bin/python3 app/main.py --smoke-test
+desktop-file-validate app/org.krect.KRect.desktop
+```
+
+Ubuntu package smoke checks install the real dependency set in disposable Docker
+containers, discover the global KPackage, launch `krect --version`, construct
+the Qt 5/6 UI offscreen, validate the desktop entry, and remove the package.
+These checks do not establish Plasma 6/Wayland window-management behavior.
+Both Ubuntu 24.04/Qt 5 and Ubuntu 26.04/Qt 6 container checks passed. Lintian
+reported no errors for the Ubuntu 24.04 package. KDE's `kstart5 --application
+org.krect.KRect` successfully launched the installed user desktop entry; its
+app D-Bus service was present and KWin reported KRect loaded.
+
+Still pending: physical shortcut key presses, a login cycle for autostart,
+interactive tray clicks by a person, KDE's separate generic config module save,
+Plasma 6 compositor sessions, mixed/fractional Wayland scaling, and actual
+display unplug/reconnect. No OS upgrade was performed.
 
 ## Automated scope
 
