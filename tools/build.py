@@ -38,7 +38,7 @@ with zipfile.ZipFile(plugin, "w") as archive:
 bundle = dist / f"krect-{version}.zip"
 with zipfile.ZipFile(bundle, "w") as archive:
     for path in sorted(ROOT.rglob("*")):
-        if not path.is_file() or any(part in {"dist", ".git", "__pycache__"} for part in path.relative_to(ROOT).parts):
+        if not path.is_file() or any(part in {"dist", ".git", "__pycache__", ".impeccable", ".wrangler", "node_modules"} for part in path.relative_to(ROOT).parts):
             continue
         add(archive, path, f"krect/{path.relative_to(ROOT).as_posix()}")
     add(archive, plugin, f"krect/dist/{plugin.name}")

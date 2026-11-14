@@ -40,6 +40,7 @@ jobs:
           from pathlib import Path
           version = json.loads(Path('package/metadata.json').read_text())['KPlugin']['Version']
           assert json.loads(Path('package.json').read_text())['version'] == version
+          assert json.loads(Path('site/config.json').read_text())['release'] == version
           assert f'VERSION = "{version}"' in Path('app/krect/__init__.py').read_text()
           assert f'version: "{version}"' in Path('src/main.js').read_text()
           if os.environ['REF_TYPE'] == 'tag':
@@ -52,6 +53,7 @@ jobs:
           runuser -u nobody -- python3 -m unittest discover -s tests -p 'test_*.py' -v
           bash -n install.sh uninstall.sh tools/plasma-tools.sh tools/smoke-deb.sh
           python3 tools/build.py
+          python3 tools/build_site.py
           QT_QPA_PLATFORM=offscreen /usr/bin/python3 app/main.py --smoke-test
           desktop-file-validate app/org.krect.KRect.desktop
           git -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code -- package/contents/code/main.js

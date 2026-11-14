@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="$lang">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$page_title</title>
+  <meta name="description" content="$description">
+  <meta name="theme-color" content="#e4eff6">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  $verification_meta
+  <link rel="canonical" href="$canonical">
+  <link rel="alternate" hreflang="ko" href="$origin/">
+  <link rel="alternate" hreflang="en" href="$origin/en/">
+  <link rel="alternate" hreflang="ja" href="$origin/ja/">
+  <link rel="alternate" hreflang="x-default" href="$origin/">
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/fonts/SUIT-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/site.css">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="KRect">
+  <meta property="og:locale" content="$og_locale">
+  <meta property="og:title" content="$page_title">
+  <meta property="og:description" content="$description">
+  <meta property="og:url" content="$canonical">
+  <meta property="og:image" content="$origin/assets/layouts.png">
+  <meta property="og:image:alt" content="$screenshot_alt">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="$page_title">
+  <meta name="twitter:description" content="$description">
+  <meta name="twitter:image" content="$origin/assets/layouts.png">
+  <script type="application/ld+json">$structured_data</script>
+  <script src="/assets/site.js" defer></script>
+</head>
+<body>
+<!--
+THESIS: A small paper manual for putting windows in place, extending the approved KRect identity.
+OWN-WORLD: Cool blue desk, white paper, ink typography, KRect blue, SUIT, curled corners.
+STORY: Try a placement, learn drag layouts, see the real app, choose the right Ubuntu package and download it for free.
+FIRST VIEWPORT: A broad paper sheet, large localized title left, interactive monitor right;
+download action sits below the title. A lifted corner turns toward the next sheet.
+FORM: User-pinned paper/page-curl direction; existing README identity; code-led interactive geometry.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+  <a class="skip-link" href="#main">$skip</a>
+  <header class="site-header wrap">
+    <a class="brand" href="$home" aria-label="$home_label"><img src="/assets/icon.svg" width="35" height="35" alt=""><span>KRect</span></a>
+    <nav aria-label="$navigation">
+      <a class="github-link" href="https://github.com/ziwon/KRect">GitHub <svg class="inline-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      $language_nav
+      <a class="nav-download" href="#download">$download</a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap">
+    <section class="paper cover" aria-labelledby="hero-title">
+      <div class="cover-copy">
+        <h1 id="hero-title">$hero_line_1<br><span>$hero_line_2</span></h1>
+        <p class="intro">$hero_description</p>
+        <a class="button primary" href="#download">$get_krect <svg class="inline-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12m-5-5 5 5 5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <p class="small cover-note"><a class="text-link" href="#snap">$hero_note</a></p>
+      </div>
+      <div class="demo" data-layout="left">
+        <div class="monitor" aria-hidden="true">
+          <div class="desktop">
+            <div class="reference-window"><div class="window-bar"><i></i><i></i></div><div class="document-lines"><b></b><i></i><i></i><i></i><i></i></div></div>
+            <div class="active-window"><div class="window-bar"><span>KRect</span><i></i></div><div class="active-content"><svg viewBox="0 0 64 64" fill="none"><path d="M14 16v32m0-15 28-17M14 33l28 15" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></svg><span>$your_window</span></div></div>
+            <div class="desktop-panel"><i></i><i></i><i></i><span></span></div>
+          </div>
+        </div>
+        <div class="demo-controls js-only" role="group" aria-label="$try_layout">
+          <button type="button" data-layout="left" data-shortcut="Ctrl + Alt + ←" aria-pressed="true"><span class="layout-icon left" aria-hidden="true"></span><span>$left</span></button>
+          <button type="button" data-layout="right" data-shortcut="Ctrl + Alt + →" aria-pressed="false"><span class="layout-icon right" aria-hidden="true"></span><span>$right</span></button>
+          <button type="button" data-layout="third" data-shortcut="Ctrl + Alt + D" aria-pressed="false"><span class="layout-icon third" aria-hidden="true"></span><span>$third</span></button>
+          <button type="button" data-layout="center" data-shortcut="Ctrl + Alt + C" aria-pressed="false"><span class="layout-icon center" aria-hidden="true"></span><span>$center</span></button>
+          <button type="button" data-layout="maximize" data-shortcut="Ctrl + Alt + Enter" aria-pressed="false"><span class="layout-icon maximize" aria-hidden="true"></span><span>$maximize</span></button>
+        </div>
+        <p class="demo-shortcut" aria-live="polite"><kbd>Ctrl + Alt + ←</kbd></p>
+        <p class="small demo-note">$demo_note</p>
+      </div>
+      <div class="cover-footer"><span>KDE Plasma 5.27 / 6</span><span>Ubuntu &amp; Kubuntu</span><span>MIT Open Source</span></div>
+      <a class="page-curl" href="#snap" aria-label="$next_page"><span aria-hidden="true"></span></a>
+    </section>
+
+    <section id="snap" class="paper snap-page" aria-labelledby="snap-title">
+      <div class="snap-copy">
+        <h2 id="snap-title">$snap_title_1<br><span>$snap_title_2</span></h2>
+        <p>$snap_intro</p>
+        <ol class="snap-steps">
+          <li>$snap_step_1</li>
+          <li>$snap_step_2</li>
+          <li>$snap_step_3</li>
+        </ol>
+        <p class="small">$snap_cancel</p>
+        <p class="small">$snap_requirement</p>
+      </div>
+      <div class="snap-evidence">
+        <figure>
+          <a href="/assets/snap-landscape.png"><img src="/assets/snap-landscape.png" width="648" height="120" loading="lazy" alt="$snap_landscape_alt"></a>
+          <figcaption>$snap_landscape_caption</figcaption>
+        </figure>
+        <figure>
+          <a href="/assets/snap-portrait.png"><img src="/assets/snap-portrait.png" width="648" height="120" loading="lazy" alt="$snap_portrait_alt"></a>
+          <figcaption>$snap_portrait_caption</figcaption>
+        </figure>
+        <p class="small snap-proof">$snap_proof</p>
+      </div>
+      <a class="page-curl" href="#features" aria-label="$next_page"><span aria-hidden="true"></span></a>
+    </section>
+
+    <section id="features" class="paper feature-page" aria-labelledby="features-title">
+      <div class="feature-copy">
+        <h2 id="features-title">$features_title_1<br>$features_title_2</h2>
+        <p>$features_intro</p>
+        <dl class="features">
+          <div><dt>$feature_1_title</dt><dd>$feature_1_body</dd></div>
+          <div><dt>$feature_2_title</dt><dd>$feature_2_body</dd></div>
+          <div><dt>$feature_3_title</dt><dd>$feature_3_body</dd></div>
+        </dl>
+        <a class="text-link" href="$readme_url">$read_guide <svg class="inline-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </div>
+      <figure class="app-shot"><a href="/assets/layouts.png"><img src="/assets/layouts.png" width="1000" height="1088" loading="lazy" alt="$screenshot_alt"></a><figcaption>$screenshot_caption</figcaption></figure>
+      <a class="page-curl" href="#download" aria-label="$next_page"><span aria-hidden="true"></span></a>
+    </section>
+
+    <section id="download" class="paper download-page" aria-labelledby="download-title">
+      <div class="download-copy">
+        <h2 id="download-title">$download_title_1<br><span>$download_title_2</span></h2>
+        <p>$download_intro</p>
+        <p class="version">KRect $release <a href="$release_url">$release_notes <svg class="inline-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></a></p>
+        <div class="compatibility"><h3>$compatibility_title</h3><p>$compatibility_body</p><p>$validation_body <a href="$validation_url">$validation_link</a></p></div>
+      </div>
+      <div class="download-form">
+        <div class="js-only">
+        <fieldset class="package-options">
+          <legend>$choose_ubuntu</legend>
+          <label><input type="radio" name="ubuntu" value="24.04" checked><span><strong>Ubuntu 24.04</strong><small>Plasma 5.27 · Qt 5</small></span></label>
+          <label><input type="radio" name="ubuntu" value="26.04"><span><strong>Ubuntu 26.04</strong><small>Plasma 6 · Qt 6</small></span></label>
+        </fieldset>
+        </div>
+        <a class="button primary download-button" href="$deb_24" data-deb24="$deb_24" data-deb26="$deb_26">$free_download <svg class="inline-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12m-5-5 5 5 5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <p class="download-status small" role="status">$free_note</p>
+        <noscript><p class="small">$noscript <a href="$deb_24">Ubuntu 24.04</a> · <a href="$deb_26">Ubuntu 26.04</a></p></noscript>
+        <div class="install-command"><code id="install-command">sudo apt install ./krect_$release-1ubuntu24.04_all.deb</code><button type="button" class="copy-command" aria-label="$copy_command" data-copied="$copied" data-copy-failed="$copy_failed">$copy</button></div>
+        <p class="small">$install_help</p>
+      </div>
+    </section>
+
+    <section class="questions" aria-labelledby="questions-title">
+      <h2 id="questions-title">$questions_title</h2>
+      <details><summary>$faq_1_question</summary><p>$faq_1_answer</p></details>
+      <details><summary>$faq_2_question</summary><p>$faq_2_answer</p></details>
+      <details><summary>$faq_3_question</summary><p>$faq_3_answer</p></details>
+      <details><summary>$faq_4_question</summary><p>$faq_4_answer</p></details>
+      <details><summary>$faq_5_question</summary><p>$faq_5_answer</p></details>
+    </section>
+  </main>
+
+  <footer class="site-footer wrap"><a class="brand" href="$home"><img src="/assets/icon.svg" width="28" height="28" alt="">KRect</a><p>$footer_note</p><nav aria-label="$footer_navigation"><a href="https://github.com/ziwon/KRect">GitHub</a><a href="https://github.com/ziwon/KRect/issues">$feedback</a><a href="https://github.com/ziwon/KRect/blob/main/LICENSE">MIT License</a></nav></footer>
+</body>
+</html>
