@@ -5,6 +5,13 @@
 <h1 align="center">KRect</h1>
 
 <p align="center">
+  <a href="https://github.com/ziwon/KRect/releases/latest"><img src="https://img.shields.io/github/v/release/ziwon/KRect?style=flat-square&amp;color=1472aa" alt="Latest release"></a>
+  <a href="https://github.com/ziwon/KRect/releases/latest"><img src="https://img.shields.io/badge/Ubuntu-24.04%20%7C%2026.04-E95420?style=flat-square" alt="Ubuntu 24.04 and 26.04 packages"></a>
+  <a href="docs/VALIDATION.md"><img src="https://img.shields.io/badge/KDE_Plasma-5.27%20%7C%206-1D99F3?style=flat-square" alt="KDE Plasma 5.27 and 6 compatibility; see validation limits"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-1472aa?style=flat-square" alt="MIT License"></a>
+</p>
+
+<p align="center">
   <b>한국어</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a>
 </p>
 
@@ -15,18 +22,37 @@
 
 <p align="center">
   <a href="https://krect.pages.dev/">웹사이트</a> ·
-  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">v0.3.0 다운로드</a> ·
-  KDE Plasma 5.27 / 6 ·
-  <a href="LICENSE">MIT License</a>
+  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">v0.3.0 다운로드</a>
 </p>
 
 <p align="center">
-  <a href="assets/readme/layouts.png"><img src="assets/readme/layouts.png" width="600" alt="KRect의 창 배치 화면: 가로·세로 듀얼 모니터 미리보기와 18개 배치 동작"></a><br>
-  <sub>Plasma 5.27 / X11에서 확인한 실제 앱 화면. 시스템 언어에 따라 한국어·영어로 표시합니다.</sub>
+  <a href="assets/readme/layouts-0.3.0.png"><img src="assets/readme/layouts-0.3.0.png" width="600" alt="KRect의 창 배치 화면: 가로·세로 듀얼 모니터 미리보기와 18개 배치 동작"></a><br>
+  <sub>KRect 0.3.0 · Plasma 5.27 / X11의 실제 앱 화면. 앱 UI는 한국어·영어를 지원합니다.</sub>
 </p>
 
 KRect는 드래그, 단축키, 앱 버튼, 트레이 메뉴로 작업 중인 창을 배치하는 네이티브 Qt 앱입니다.
 기존 KWin 위에서 동작하며 KDE의 작업 영역과 전역 단축키를 사용합니다.
+
+## 끌어서 고르고, 놓으면 끝
+
+**0.3.0부터 창을 화면 상단으로 끌어 배치할 수 있습니다.**
+
+1. 창의 **제목 표시줄**을 잡고 모니터 **상단 중앙**으로 끕니다.
+2. 나타난 배치 막대에서 원하는 영역으로 이동해 위치를 미리 봅니다.
+3. **마우스를 놓으면** 그 영역에 창이 배치됩니다.
+
+<p align="center">
+  <a href="assets/readme/snap-landscape.png"><img src="assets/readme/snap-landscape.png" width="648" alt="상단 드래그 배치 막대: 왼쪽 반쪽을 선택한 실제 화면"></a><br>
+  <sub>가로 화면 · 2분할, 3분할, 비대칭 ⅓·⅔, 4분할</sub>
+</p>
+
+<p align="center">
+  <a href="assets/readme/snap-portrait.png"><img src="assets/readme/snap-portrait.png" width="648" alt="세로 모니터용 배치 막대: 위아래 3분할 중 가운데 영역을 선택한 실제 화면"></a><br>
+  <sub>세로 화면 · ⅓·⅔ 배치가 위아래로 전환됩니다. 두 이미지 모두 Plasma 5.27 / X11에서 촬영했습니다.</sub>
+</p>
+
+KRect를 **트레이에서 실행해 두세요**. 막대를 벗어나면 일반 드래그를 계속하고, `Esc`로 취소할 수 있습니다.
+최대화 버튼에 마우스를 올리는 방식은 지원하지 않습니다.
 
 ## KDE에서 편하게 창 정리
 

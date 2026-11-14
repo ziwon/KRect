@@ -5,6 +5,13 @@
 <h1 align="center">KRect</h1>
 
 <p align="center">
+  <a href="https://github.com/ziwon/KRect/releases/latest"><img src="https://img.shields.io/github/v/release/ziwon/KRect?style=flat-square&amp;color=1472aa" alt="Latest release"></a>
+  <a href="https://github.com/ziwon/KRect/releases/latest"><img src="https://img.shields.io/badge/Ubuntu-24.04%20%7C%2026.04-E95420?style=flat-square" alt="Ubuntu 24.04 and 26.04 packages"></a>
+  <a href="docs/VALIDATION.md"><img src="https://img.shields.io/badge/KDE_Plasma-5.27%20%7C%206-1D99F3?style=flat-square" alt="KDE Plasma 5.27 and 6 compatibility; see validation limits"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-1472aa?style=flat-square" alt="MIT License"></a>
+</p>
+
+<p align="center">
   <a href="README.md">한국어</a> · <b>English</b> · <a href="README.ja.md">日本語</a>
 </p>
 
@@ -15,18 +22,37 @@
 
 <p align="center">
   <a href="https://krect.pages.dev/en/">Website</a> ·
-  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">Download v0.3.0</a> ·
-  KDE Plasma 5.27 / 6 ·
-  <a href="LICENSE">MIT License</a>
+  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">Download v0.3.0</a>
 </p>
 
 <p align="center">
-  <a href="assets/readme/layouts.png"><img src="assets/readme/layouts.png" width="600" alt="KRect layout screen with a landscape and portrait monitor preview and 18 window actions"></a><br>
-  <sub>Actual app on Plasma 5.27 / X11. The interface follows your system language: Korean or English.</sub>
+  <a href="assets/readme/layouts-0.3.0.png"><img src="assets/readme/layouts-0.3.0.png" width="600" alt="KRect layout screen with a landscape and portrait monitor preview and 18 window actions"></a><br>
+  <sub>KRect 0.3.0 on Plasma 5.27 / X11. The native app UI supports Korean and English.</sub>
 </p>
 
 KRect is a native Qt app that arranges your work windows by dragging or through shortcuts, buttons, and a tray menu.
 It works with your existing KWin session, using KDE's work areas and global shortcuts.
+
+## Drag, choose, and drop
+
+**Since 0.3.0, drag a window to the top of a display to arrange it.**
+
+1. Grab the window’s **title bar** and drag it to the **top center** of a display.
+2. Move over a region on the snap bar to preview the destination.
+3. **Release the mouse** to place the window there.
+
+<p align="center">
+  <a href="assets/readme/snap-landscape.png"><img src="assets/readme/snap-landscape.png" width="648" alt="Real top snap bar with the left-half region selected"></a><br>
+  <sub>Landscape · halves, thirds, asymmetric thirds, and quarters</sub>
+</p>
+
+<p align="center">
+  <a href="assets/readme/snap-portrait.png"><img src="assets/readme/snap-portrait.png" width="648" alt="Real portrait snap bar with the vertically stacked center-third region selected"></a><br>
+  <sub>Portrait · thirds and two thirds stack vertically. Both images were captured on Plasma 5.27 / X11.</sub>
+</p>
+
+Keep KRect **running in the tray**. Leave the bar to continue a normal drag, or press `Esc` to cancel.
+Hovering over a maximize button is not supported.
 
 ## Window management that fits KDE
 

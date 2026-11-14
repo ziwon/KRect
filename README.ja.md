@@ -5,6 +5,13 @@
 <h1 align="center">KRect</h1>
 
 <p align="center">
+  <a href="https://github.com/ziwon/KRect/releases/latest"><img src="https://img.shields.io/github/v/release/ziwon/KRect?style=flat-square&amp;color=1472aa" alt="Latest release"></a>
+  <a href="https://github.com/ziwon/KRect/releases/latest"><img src="https://img.shields.io/badge/Ubuntu-24.04%20%7C%2026.04-E95420?style=flat-square" alt="Ubuntu 24.04 and 26.04 packages"></a>
+  <a href="docs/VALIDATION.md"><img src="https://img.shields.io/badge/KDE_Plasma-5.27%20%7C%206-1D99F3?style=flat-square" alt="KDE Plasma 5.27 and 6 compatibility; see validation limits"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-1472aa?style=flat-square" alt="MIT License"></a>
+</p>
+
+<p align="center">
   <a href="README.md">한국어</a> · <a href="README.en.md">English</a> · <b>日本語</b>
 </p>
 
@@ -15,18 +22,37 @@
 
 <p align="center">
   <a href="https://krect.pages.dev/ja/">ウェブサイト</a> ·
-  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">v0.3.0をダウンロード</a> ·
-  KDE Plasma 5.27 / 6 ·
-  <a href="LICENSE">MIT License</a>
+  <a href="https://github.com/ziwon/KRect/releases/tag/v0.3.0">v0.3.0をダウンロード</a>
 </p>
 
 <p align="center">
-  <a href="assets/readme/layouts.png"><img src="assets/readme/layouts.png" width="600" alt="KRectの実画面。横向き・縦向きモニターのプレビューと18のウィンドウ操作。"></a><br>
-  <sub>Plasma 5.27 / X11で確認した実際のアプリ画面。アプリのUIは韓国語・英語に対応しています。</sub>
+  <a href="assets/readme/layouts-0.3.0.png"><img src="assets/readme/layouts-0.3.0.png" width="600" alt="KRectの実画面。横向き・縦向きモニターのプレビューと18のウィンドウ操作。"></a><br>
+  <sub>KRect 0.3.0 · Plasma 5.27 / X11で撮影した実際のアプリ画面。アプリのUIは韓国語・英語に対応しています。</sub>
 </p>
 
 KRectは、ドラッグ、ショートカット、ボタン、トレイメニューで作業中のウィンドウを配置するネイティブQtアプリです。
 既存のKWin上で動作し、KDEの作業領域とグローバルショートカットを使用します。
+
+## ドラッグして、選んで、離すだけ
+
+**0.3.0から、ウィンドウを画面上部へドラッグして配置できます。**
+
+1. ウィンドウの**タイトルバー**をつかみ、モニター**上部の中央**へドラッグします。
+2. 表示された配置バーの領域に移動し、配置先をプレビューします。
+3. **マウスを離すと**、その領域にウィンドウが配置されます。
+
+<p align="center">
+  <a href="assets/readme/snap-landscape.png"><img src="assets/readme/snap-landscape.png" width="648" alt="左半分の領域を選択した実際の上部配置バー"></a><br>
+  <sub>横向き画面 · 2分割、3分割、非対称の⅓・⅔配置、4分割</sub>
+</p>
+
+<p align="center">
+  <a href="assets/readme/snap-portrait.png"><img src="assets/readme/snap-portrait.png" width="648" alt="上下3分割の中央領域を選択した、縦向きモニター用の実際の配置バー"></a><br>
+  <sub>縦向き画面 · ⅓・⅔の領域が上下に並びます。どちらもPlasma 5.27 / X11で撮影しました。</sub>
+</p>
+
+KRectを**トレイで起動しておいてください**。バーの外に移動すれば通常のドラッグを続けられ、`Esc`でキャンセルできます。
+最大化ボタンへのホバーには対応していません。
 
 ## KDEで快適にウィンドウを整理
 
