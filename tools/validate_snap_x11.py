@@ -8,6 +8,7 @@ import ctypes as F
 import ctypes.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -50,8 +51,11 @@ def main():
         raise SystemExit("This live input harness is for KDE/X11 only.")
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     app = W.QApplication(["krect"])
+    app.setApplicationDisplayName("KRect")
     app.setDesktopFileName("org.krect.KRect")
     app.setQuitOnLastWindowClosed(False)
+    controls = W.QLabel("KRect validation controls — temporary window")
+    controls.setWindowTitle("KRect Validation Controls")
     bridge, bar = Bridge(), SnapBar()
     bridge.snap_updated.connect(bar.receive)
     qtbus = D.QDBusConnection.sessionBus()
@@ -85,7 +89,9 @@ poll.timeout.connect(function () {
                 if (c.action === "setup") { w.setMaximize(false, false); w.frameGeometry = c.geometry; workspace.activeClient = w; }
                 if (c.action === "restore") { result.restored = controller.execute("restore", w); }
                 if (c.action === "maximize") { controller.execute("maximize", w); }
-                result.geometry = geometry(w); result.move = w.move;
+                if (c.action === "keep-above") { w.keepAbove = Boolean(c.enabled); }
+                result.keepAbove = w.keepAbove;
+                result.geometry = geometry(w); result.move = w.move; result.windowId = Number(w.windowId);
                 result.active = workspace.activeClient === w; result.caption = String(workspace.activeClient && workspace.activeClient.caption); result.noBorder = w.noBorder; result.clientGeometry = module.exports.rect(w.clientGeometry || w.frameGeometry);
                 result.maximized = { horizontal: w.maximizedHorizontally, vertical: w.maximizedVertically };
                 result.area = module.exports.rect(workspace.clientArea(KWin.MaximizeArea, w));
@@ -93,8 +99,8 @@ poll.timeout.connect(function () {
                 for (var i = 0; i < workspace.numScreens; i++) {
                     result.screens.push(module.exports.rect(workspace.clientArea(KWin.MaximizeArea, i, workspace.currentDesktop)));
                 }
-                var overlays = workspace.clientList().filter(function (x) { return String(x.caption) === "KRect Snap Bar"; });
-                result.overlays = overlays.map(function (x) { return { geometry: geometry(x), app: String(x.resourceClass), above: x.keepAbove }; });
+                var overlays = workspace.clientList().filter(function (x) { return /^KRect Snap Bar(?: — KRect)?$/.test(String(x.caption)); });
+                result.overlays = overlays.map(function (x) { return { geometry: geometry(x), app: String(x.resourceClass), above: x.keepAbove, windowId: Number(x.windowId) }; });
             }
         } catch (error) { result.error = String(error); }
         send("TestUpdate", JSON.stringify(result));
@@ -176,6 +182,11 @@ poll.timeout.connect(function () {
         model = bridge.models[-1]
         assert state["active"], "Overlay stole focus"
         assert state["overlays"] and state["overlays"][0]["geometry"] == model["geometry"], state
+        properties = subprocess.check_output(["xprop", "-id", str(state["overlays"][0]["windowId"]), "_NET_WM_STATE"], text=True)
+        assert "_NET_WM_STATE(ATOM)" in properties and "_NET_WM_STATE_HIDDEN" not in properties, properties
+        stacking = subprocess.check_output(["xprop", "-root", "_NET_CLIENT_LIST_STACKING"], text=True)
+        window_ids = [int(value, 16) for value in re.findall(r"0x[0-9a-fA-F]+", stacking)]
+        assert window_ids.index(state["overlays"][0]["windowId"]) > window_ids.index(state["windowId"]), stacking
         cell = next(c["rect"] for c in model["cells"] if c["action"] == action)
         g = model["geometry"]
         move(g["x"] + cell["x"] + cell["width"] / 2, g["y"] + cell["y"] + cell["height"] / 2)
@@ -190,6 +201,7 @@ poll.timeout.connect(function () {
         assert script_id >= 0
         loaded = True
         dbus.Interface(bus.get_object("org.kde.KWin", f"/{script_id}"), "org.kde.kwin.Script").run()
+        controls.show()
         client = subprocess.Popen(["/usr/bin/python3", "-c", '''
 from PyQt5 import QtWidgets as W, QtCore as C
 app=W.QApplication(["krect-snap-validation-client"])
@@ -245,6 +257,17 @@ w.resize(700,450);w.show();C.QTimer.singleShot(90000,app.quit);app.exec_()
         command("restore"); wait()
         assert command()["geometry"] == before["geometry"]
         checks.append("portrait monitor transfer, vertical thirds and restore")
+
+        command("keep-above", enabled=True)
+        before, area = begin("left")
+        button(False); wait(.3)
+        after = command()
+        expected = dict(x=area["x"]+8, y=area["y"]+8, width=round(area["width"]/2)-12, height=area["height"]-16)
+        assert after["geometry"] == expected and after["active"] and after["keepAbove"], after
+        command("restore"); wait()
+        assert command()["geometry"] == before["geometry"]
+        command("keep-above", enabled=False)
+        checks.append("bar above an always-on-top window, preserved focus/preference, drop and restore")
         assert not bridge.logs, bridge.logs
         (EVIDENCE / "results.json").write_text(json.dumps(dict(checks=checks, logs=bridge.logs), indent=2)+"\n")
         print(json.dumps(dict(passed=len(checks), checks=checks), ensure_ascii=False))
@@ -260,6 +283,7 @@ w.resize(700,450);w.show();C.QTimer.singleShot(90000,app.quit);app.exec_()
             client.terminate(); client.wait(timeout=5)
         move(*saved_pointer)
         bar.dismiss()
+        controls.close()
         x.XCloseDisplay(display)
 
 

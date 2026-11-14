@@ -35,6 +35,7 @@ class SnapTests(unittest.TestCase):
         self.bridge.SnapUpdate(json.dumps(self.model))
         self.app.processEvents()
         self.assertTrue(self.bar.isVisible())
+        self.assertEqual(self.bar.windowType(), C.Qt.WindowType.Window)
         self.assertTrue(self.bar.windowFlags() & C.Qt.WindowType.WindowTransparentForInput)
         self.assertTrue(self.bar.windowFlags() & C.Qt.WindowType.WindowDoesNotAcceptFocus)
         self.assertFalse(self.bar.grab().isNull())

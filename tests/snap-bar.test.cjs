@@ -7,7 +7,7 @@ function signal() {
     return { connect(fn) { handlers.push(fn); }, emit(...args) { handlers.forEach(fn => fn(...args)); } };
 }
 
-function desktop({ plasma5 = false, config = {}, app = true } = {}) {
+function desktop({ plasma5 = false, config = {}, app = true, overlayCaption = 'KRect Snap Bar — KRect' } = {}) {
     const screens = [
         { name: 'wide', geometry: { x: -1920, y: 300, width: 1920, height: 1080 }, area: { x: -1920, y: 340, width: 1920, height: 1040 } },
         { name: 'portrait', geometry: { x: 0, y: 0, width: 1080, height: 1920 }, area: { x: 0, y: 0, width: 1080, height: 1880 } }
@@ -40,7 +40,7 @@ function desktop({ plasma5 = false, config = {}, app = true } = {}) {
             if (method !== 'SnapUpdate') return;
             const model = JSON.parse(raw); updates.push(model);
             if (model.visible && app && !overlay) {
-                overlay = { internalId: 'overlay', resourceClass: 'krect', caption: 'KRect Snap Bar',
+                overlay = { internalId: 'overlay', resourceClass: 'krect', caption: overlayCaption,
                     frameGeometry: { x: 0, y: 0, width: 648, height: 120 } };
                 ws.windowAdded.emit(overlay);
             }
@@ -97,6 +97,28 @@ test('a hidden or absent app cannot produce an invisible snap target', () => {
     const dragged = { ...h.work.frameGeometry }; h.finish();
     assert.deepEqual(h.work.frameGeometry, dragged);
     assert.deepEqual(h.outlines, []);
+});
+
+test('bare overlay titles work, but other KRect windows cannot become snap targets', () => {
+    for (const caption of ['KRect Snap Bar', 'KRect', 'KRect Snap Bar settings']) {
+        const h = desktop({ overlayCaption: caption }); h.begin(); h.hover('left');
+        const dragged = { ...h.work.frameGeometry }; h.finish();
+        assert.deepEqual(h.work.frameGeometry, caption === 'KRect Snap Bar' ?
+            api.zone(h.screens[0].area, [0, 0, .5, 1], 8) : dragged);
+    }
+});
+
+test('the compositor raises the overlay while keeping the dragged window active', () => {
+    const h = desktop(), raised = [];
+    h.ws.raiseWindow = w => raised.push(w);
+    h.work.keepAbove = true;
+    h.begin(); h.hover('left');
+    assert.ok(raised.length > 0);
+    assert.ok(raised.every(w => w.internalId === 'overlay' && w.keepAbove));
+    assert.equal(h.ws.activeWindow, h.work);
+    h.finish();
+    assert.equal(h.ws.activeWindow, h.work);
+    assert.equal(h.work.keepAbove, true);
 });
 
 test('leaving the strip, its gaps, or releasing before entering a cell preserves normal dragging', () => {

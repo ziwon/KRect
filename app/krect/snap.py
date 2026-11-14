@@ -5,7 +5,8 @@ from .qt import QtCore as C, QtGui as G, QtWidgets as W
 
 class SnapBar(W.QWidget):
     def __init__(self):
-        flags = (C.Qt.WindowType.Tool | C.Qt.WindowType.FramelessWindowHint |
+        # KWin hides Tool windows when another application's window is active.
+        flags = (C.Qt.WindowType.Window | C.Qt.WindowType.FramelessWindowHint |
                  C.Qt.WindowType.WindowStaysOnTopHint | C.Qt.WindowType.WindowDoesNotAcceptFocus |
                  C.Qt.WindowType.WindowTransparentForInput)
         super().__init__(None, flags)
@@ -36,6 +37,9 @@ class SnapBar(W.QWidget):
             self.resize(round(geometry["width"]), round(geometry["height"]))
             self.show()
             # KWin positions the mapped window; Qt cannot do this on Wayland.
+        # Another always-on-top window can be raised during the drag.
+        if W.QApplication.platformName() == "xcb":
+            self.raise_()
         self.watchdog.start()
         self.update()
 

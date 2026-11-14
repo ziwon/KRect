@@ -304,6 +304,8 @@
             if (!near(overlay.frameGeometry, drag.layout.geometry, 1)) {
                 overlay.frameGeometry = rect(drag.layout.geometry);
             }
+            // Plasma 6 can raise Wayland windows without activating them.
+            if (typeof ws.raiseWindow === "function") { ws.raiseWindow(overlay); }
         }
 
         function updateDrag() {
@@ -413,7 +415,8 @@
             if (tracked[key]) { return; }
             tracked[key] = { mode: typeof w.maximizeMode === "number" ? w.maximizeMode : null,
                 idleGeometry: valid(w.frameGeometry) ? rect(w.frameGeometry) : null };
-            if (ownWindow(w) && String(w.caption) === "KRect Snap Bar") { overlay = w; positionOverlay(); }
+            // Qt appends the application display name to native window titles.
+            if (ownWindow(w) && /^KRect Snap Bar(?: — KRect)?$/.test(String(w.caption))) { overlay = w; positionOverlay(); }
             if (w.frameGeometryChanged && env.callDBus) {
                 w.frameGeometryChanged.connect(function () {
                     if (tracked[key] && !w.move && !w.resize) { tracked[key].idleGeometry = rect(w.frameGeometry); }
