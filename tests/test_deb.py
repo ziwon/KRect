@@ -21,6 +21,7 @@ class DebianTests(unittest.TestCase):
                     info = subprocess.check_output(["dpkg-deb", "-f", str(deb)], text=True)
                     self.assertIn("Architecture: all", info)
                     self.assertIn(f"kpackagetool{major}", info)
+                    self.assertIn(f"python3-pyqt{major}", info)
                     self.assertNotIn(f"kpackagetool{11 - major}", info)
                     self.assertIn(f"-1ubuntu{ubuntu}", info)
                     unpacked = Path(temporary) / ubuntu
@@ -30,9 +31,13 @@ class DebianTests(unittest.TestCase):
                                      (ROOT / "src/main.js").read_bytes())
                     self.assertTrue((plugin / "contents/ui/config.ui").is_file())
                     self.assertTrue((unpacked / "usr/share/doc/krect/copyright").is_file())
+                    self.assertTrue((unpacked / "usr/share/krect/main.py").is_file())
+                    self.assertTrue((unpacked / "usr/share/applications/org.krect.KRect.desktop").is_file())
+                    self.assertTrue((unpacked / "usr/share/icons/hicolor/scalable/apps/org.krect.KRect.svg").is_file())
                     self.assertEqual([p.name for p in (unpacked / "DEBIAN").iterdir()], ["control"])
                     for path in unpacked.rglob("*"):
-                        self.assertEqual(path.stat().st_mode & 0o777, 0o755 if path.is_dir() else 0o644)
+                        self.assertEqual(path.stat().st_mode & 0o777,
+                                         0o755 if path.is_dir() or path == unpacked / "usr/bin/krect" else 0o644)
 
     def test_build_is_reproducible(self):
         with tempfile.TemporaryDirectory() as temporary:

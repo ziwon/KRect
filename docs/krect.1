@@ -1,0 +1,38 @@
+.TH KRECT 1 "November 2026" "KRect" "User Commands"
+.SH NAME
+krect \- Rectangle-style window placement for KDE
+.SH SYNOPSIS
+.B krect
+.RI [ options ]
+.SH DESCRIPTION
+KRect provides a native window-placement interface, system tray controls,
+layout previews, KDE shortcut editing and placement preferences.
+The placement engine runs inside KWin on Plasma 5.27 or Plasma 6.
+Select a work window, then apply a layout from KRect or its tray menu.
+.SH OPTIONS
+.TP
+.B \-\-background
+Start in the system tray. Show the window if a tray is unavailable.
+.TP
+.B \-\-language ko|en
+Override the desktop language.
+.TP
+.B \-\-version
+Print the application version and exit.
+.TP
+.B \-\-smoke-test
+Construct and render the interface without sending compositor commands.
+.TP
+.B \-\-help
+Show command-line help.
+.SH NOTES
+Quitting the app leaves KWin shortcuts active. Disable KRect in the app
+to stop window management. Applying preferences or reloading the engine
+clears saved original placements.
+.SH FILES
+.I ~/.config/kwinrc
+stores placement preferences in the Script-krect group.
+.I ~/.config/autostart/org.krect.KRect.desktop
+is created only when login startup is enabled.
+.SH SEE ALSO
+Project documentation: https://github.com/ziwon/KRect

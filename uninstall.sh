@@ -32,6 +32,7 @@ for krect_dbus in "qdbus$krect_major" "/usr/lib/qt$krect_major/bin/qdbus" qdbus;
     fi
 done
 "$krect_package_tool" --type=KWin/Script --remove krect
+/usr/bin/python3 "$krect_root/tools/install_app.py" --remove
 printf '%s\n' 'KRect package removed. Saved settings and custom shortcuts are retained.'
 if [[ "$krect_unloaded" == false ]]; then
     printf '%s\n' 'Log out and back in to stop the currently loaded script.'

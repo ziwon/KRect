@@ -2,10 +2,10 @@
 set -euo pipefail
 
 if [[ "${1:-}" == "--help" ]]; then
-    printf '%s\n' 'Usage: bash install.sh' 'Install or update KRect for the current user; enable it in KDE System Settings.'
+    printf '%s\n' 'Usage: bash install.sh [--script-only]' 'Install the desktop app and KWin engine for the current user.'
     exit 0
 fi
-if [[ $# -ne 0 ]]; then
+if [[ $# -gt 1 || ( $# -eq 1 && $1 != --script-only ) ]]; then
     printf '%s\n' 'Unknown argument. Use --help.' >&2
     exit 2
 fi
@@ -31,8 +31,15 @@ else
     "$krect_package_tool" --type=KWin/Script --install "$krect_root/package"
 fi
 
+if [[ ${1:-} != --script-only ]]; then
+    /usr/bin/python3 "$krect_root/tools/install_app.py"
+    if command -v kbuildsycoca"$krect_major" >/dev/null 2>&1; then
+        kbuildsycoca"$krect_major" --noincremental >/dev/null 2>&1 || true
+    fi
+fi
+
 printf '%s\n' \
     'KRect package installed for this user.' \
-    'Open System Settings → Window Management → KWin Scripts.' \
-    'Enable KRect and click Apply. For an update, disable/apply, then enable/apply.' \
+    'Open KRect from the application launcher and click Enable KRect.' \
+    'The script can also be enabled in System Settings → Window Management → KWin Scripts.' \
     'Change shortcuts in Keyboard → Shortcuts; search for KRect.'

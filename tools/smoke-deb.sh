@@ -20,6 +20,12 @@ krect_listing=$(QT_QPA_PLATFORM=offscreen "kpackagetool$krect_major" --type=KWin
 printf '%s\n' "$krect_listing"
 [[ $krect_listing =~ (^|[[:space:]])krect($|[[:space:]]) ]]
 cmp src/main.js /usr/share/kwin/scripts/krect/contents/code/main.js
+desktop-file-validate /usr/share/applications/org.krect.KRect.desktop
+krect --version
+QT_QPA_PLATFORM=offscreen krect --smoke-test
 dpkg --remove krect
 test ! -e /usr/share/kwin/scripts/krect/metadata.json
+test ! -e /usr/bin/krect
+test ! -e /usr/share/applications/org.krect.KRect.desktop
+test ! -e /usr/share/krect
 printf 'Ubuntu package install, KPackage discovery, and removal passed for Plasma %s.\n' "$krect_major"

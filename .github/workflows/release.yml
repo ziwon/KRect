@@ -23,7 +23,7 @@ jobs:
       - name: Install validation tools
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3 dpkg util-linux
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3 dpkg util-linux python3-dbus python3-pyqt5 libqt5svg5 desktop-file-utils
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -40,6 +40,8 @@ jobs:
           from pathlib import Path
           version = json.loads(Path('package/metadata.json').read_text())['KPlugin']['Version']
           assert json.loads(Path('package.json').read_text())['version'] == version
+          assert f'VERSION = "{version}"' in Path('app/krect/__init__.py').read_text()
+          assert f'version: "{version}"' in Path('src/main.js').read_text()
           if os.environ['REF_TYPE'] == 'tag':
               assert os.environ['REF_NAME'] == f'v{version}', 'Tag must match package version'
           PY
@@ -50,6 +52,8 @@ jobs:
           runuser -u nobody -- python3 -m unittest discover -s tests -p 'test_*.py' -v
           bash -n install.sh uninstall.sh tools/plasma-tools.sh tools/smoke-deb.sh
           python3 tools/build.py
+          QT_QPA_PLATFORM=offscreen /usr/bin/python3 app/main.py --smoke-test
+          desktop-file-validate app/org.krect.KRect.desktop
           git -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code -- package/contents/code/main.js
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -79,7 +83,7 @@ jobs:
       - name: Install packaging tools
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3 dpkg-dev lintian
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3 dpkg-dev lintian desktop-file-utils
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
