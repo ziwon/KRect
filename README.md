@@ -4,7 +4,7 @@ KDE Plasma 5.27·6에서 Rectangle처럼 단축키로 창을 배치하는 KWin �
 Ubuntu에 KDE를 설치한 환경 또는 Kubuntu의 **Plasma 5.27 / 6 세션**을 대상으로 한다.
 독립 창 관리자를 새로 실행하지 않고, 기존 KWin이 관리하는 활성 창을 조작한다.
 
-**상태:** 자동 테스트 50개(Node 39개, Python 11개)를 통과했다. 현재 데스크톱의
+**상태:** 자동 테스트 52개(Node 39개, Python 13개)를 통과했다. 현재 데스크톱의
 Plasma 5.27.12 / KWin 5.27.11 / X11에서 KPackage 설치, 실제 창 배치·순환·복원,
 가로/세로 듀얼 모니터 이동과 Qt 5 설정 폼 생성을 확인했다.
 Plasma 6 / Wayland의 실기 검증과 시스템 설정에서의 설정 저장은 아직 남아 있다.
@@ -26,6 +26,24 @@ GNOME과 Plasma 5.26 이하는 대상이 아니다. 배포판 이름보다 `plas
 Rectangle의 코드를 이식하지 않은 독립 구현이며 Rectangle/KDE 공식 제품이 아니다.
 
 ## 설치
+
+Ubuntu용 `.deb`는 [GitHub Releases](https://github.com/ziwon/KRect/releases)에서
+OS 버전에 맞춰 선택한다. 태그 릴리즈에는 다음 두 파일을 자동 생성한다.
+
+| Ubuntu | Plasma | 파일명 예시 |
+| --- | --- | --- |
+| 24.04 LTS | 5.27 | `krect_0.1.0-1ubuntu24.04_all.deb` |
+| 26.04 LTS | 6 | `krect_0.1.0-1ubuntu26.04_all.deb` |
+
+```bash
+sudo apt install ./krect_0.1.0-1ubuntu24.04_all.deb
+```
+
+`.deb`는 `/usr/share/kwin/scripts/krect`에 시스템 범위로 설치한다.
+설치 후 시스템 설정의 KWin 스크립트에서 KRect를 켠다.
+기존 사용자 범위 설치가 있으면 그 복사본이 우선하므로 먼저 아래 `uninstall.sh`로 제거한다.
+`.deb` 제거는 `sudo apt remove krect`를 사용하고, 실행 중인 스크립트는 해제하거나 다시 로그인한다.
+빌드·태그 릴리즈 절차는 [docs/RELEASING.md](docs/RELEASING.md)에 있다.
 
 GitHub에서 가져오는 경우 다음과 같이 설치한다. `package/`에 설치용 코드가 포함되어 있어
 별도 빌드는 필요 없다.

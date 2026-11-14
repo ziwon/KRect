@@ -1,0 +1,115 @@
+name: Validate and package
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Check release version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          version = json.loads(Path('package/metadata.json').read_text())['KPlugin']['Version']
+          assert json.loads(Path('package.json').read_text())['version'] == version
+          if os.environ['REF_TYPE'] == 'tag':
+              assert os.environ['REF_NAME'] == f'v{version}', 'Tag must match package version'
+          PY
+      - name: Test and build distributions
+        run: |
+          node --test tests/*.test.cjs
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          bash -n install.sh uninstall.sh tools/plasma-tools.sh tools/smoke-deb.sh
+          python3 tools/build.py
+          git diff --exit-code -- package/contents/code/main.js
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: distributions
+          path: |
+            dist/*.kwinscript
+            dist/*.zip
+          if-no-files-found: error
+
+  deb:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ubuntu: '24.04'
+            plasma: '5'
+          - ubuntu: '26.04'
+            plasma: '6'
+    container: ubuntu:${{ matrix.ubuntu }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install packaging tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3 dpkg-dev lintian
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and check Ubuntu package
+        env:
+          UBUNTU_VERSION: ${{ matrix.ubuntu }}
+          PLASMA_MAJOR: ${{ matrix.plasma }}
+        run: |
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+          python3 tools/build_deb.py --ubuntu "$UBUNTU_VERSION"
+          lintian --fail-on error dist/*.deb
+          bash tools/smoke-deb.sh dist/*.deb "$PLASMA_MAJOR"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb-ubuntu-${{ matrix.ubuntu }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [validate, deb]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cd dist
+          sha256sum -- *.deb *.kwinscript *.zip > SHA256SUMS
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes --title "KRect $RELEASE_TAG"
+          fi
+          gh release upload "$RELEASE_TAG" --clobber -- *.deb *.kwinscript *.zip SHA256SUMS
