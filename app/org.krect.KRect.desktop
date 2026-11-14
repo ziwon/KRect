@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=KRect
+GenericName=Window Manager
+GenericName[ko]=창 배치 도구
+Comment=Rectangle-style window placement for KDE
+Comment[ko]=KDE용 Rectangle 스타일 창 배치
+Exec=krect
+Icon=org.krect.KRect
+Terminal=false
+Categories=Qt;KDE;Utility;
+Keywords=Rectangle;window;tiling;snap;layout;
+Keywords[ko]=Rectangle;창;배치;분할;타일링;
+StartupNotify=true
+StartupWMClass=krect
+OnlyShowIn=KDE;

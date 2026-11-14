@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * KRect 0.1.0 — keyboard-driven window placement for KWin / Plasma 5.27 and 6.
+ * KRect 0.2.0 — window placement for KWin / Plasma 5.27 and 6.
  * This file is both the KWin entry point and a dependency-free Node test module.
  */
 (function (root, factory) {
@@ -14,6 +14,7 @@
             readConfig: readConfig,
             registerShortcut: registerShortcut,
             registerUserActionsMenu: registerUserActionsMenu,
+            callDBus: typeof callDBus === "function" ? callDBus : null,
             log: function (message) { console.log("KRect: " + message); }
         });
     }
@@ -122,6 +123,62 @@
         var tracked = Object.create(null);
         var now = env.now || function () { return Date.now(); };
         var cfg = env.readConfig;
+        var lastWindow = null;
+
+        function ownWindow(w) {
+            return w && [w.resourceClass, w.resourceName, w.desktopFileName].some(function (value) {
+                return /^(org\.krect\.krect|krect)$/.test(String(value || "").toLowerCase());
+            });
+        }
+
+        function currentContext(w) {
+            if (!w) { return false; }
+            if (plasma5 && typeof w.desktop === "number" && w.desktop !== -1 && w.desktop !== ws.currentDesktop) { return false; }
+            if (!plasma5 && w.desktops && w.desktops.length &&
+                    Array.prototype.indexOf.call(w.desktops, ws.currentDesktop) === -1) { return false; }
+            return !w.activities || !w.activities.length || !ws.currentActivity ||
+                Array.prototype.indexOf.call(w.activities, ws.currentActivity) !== -1;
+        }
+
+        function appTarget() {
+            return currentContext(lastWindow) && eligible(lastWindow, settings()) ? lastWindow : null;
+        }
+
+        function publish(result) {
+            if (!env.callDBus) { return; }
+            var w = appTarget();
+            var output = w ? screenFor(w) : null;
+            var status = { protocol: 1, version: "0.2.0", target: w ? {
+                id: id(w), caption: String(w.caption || w.resourceClass || "Window"),
+                application: String(w.desktopFileName || w.resourceClass || ""),
+                geometry: rect(w.frameGeometry), area: areaFor(output, w), screen: name(output),
+                canRestore: Boolean(states[id(w)]), maximizable: Boolean(w.maximizable),
+                movableAcrossScreens: Boolean(w.moveableAcrossScreens)
+            } : null, screens: screenList().map(function (screen) {
+                return { name: name(screen), geometry: rect(screen.geometry), area: areaFor(screen, w) };
+            }), result: result || null };
+            env.callDBus("org.krect.KRect", "/KRect", "org.krect.KRect", "Update", JSON.stringify(status));
+        }
+
+        function activated(w) {
+            if (ownWindow(w)) { publish(); return; }
+            if (w && (w.normalWindow || w.dialog)) { lastWindow = eligible(w, settings()) ? w : null; }
+            publish();
+        }
+
+        function appCommand() {
+            if (!env.callDBus) { return; }
+            env.callDBus("org.krect.KRect", "/KRect", "org.krect.KRect", "TakeCommand", function (raw) {
+                try {
+                    var command = JSON.parse(String(raw || "{}"));
+                    if (!command.token) { publish(); return; }
+                    var w = appTarget();
+                    var known = ACTIONS.some(function (a) { return a[0] === command.action; });
+                    var success = Boolean(known && w && id(w) === command.target && safeExecute(command.action, w));
+                    publish({ token: command.token, success: success });
+                } catch (error) { log("Desktop app command failed: " + String(error)); publish(); }
+            });
+        }
 
         function settings() {
             return {
@@ -138,7 +195,7 @@
         function log(message) { if (env.log) { env.log(message); } }
 
         function eligible(w, opts) {
-            if (!w || w.deleted || !w.managed || !(w.normalWindow || w.dialog) ||
+            if (!w || ownWindow(w) || w.deleted || !w.managed || !(w.normalWindow || w.dialog) ||
                     w.fullScreen || w.specialWindow || w.minimized || w.shade || w.move || w.resize ||
                     !w.moveable || !w.resizeable || !valid(w.frameGeometry)) {
                 return false;
@@ -192,11 +249,14 @@
             var key = id(w);
             if (tracked[key]) { return; }
             tracked[key] = { mode: typeof w.maximizeMode === "number" ? w.maximizeMode : null };
+            if (w.frameGeometryChanged && env.callDBus) {
+                w.frameGeometryChanged.connect(function () { if (lastWindow === w) { publish(); } });
+            }
             if (w.maximizedAboutToChange) {
                 w.maximizedAboutToChange.connect(function (mode) {
                     if (tracked[key]) { tracked[key].mode = Number(mode); }
                 });
-            } else if (w.clientMaximizedStateAboutToChange) {
+            } else if (!ws.clientMaximizeSet && w.clientMaximizedStateAboutToChange) {
                 w.clientMaximizedStateAboutToChange.connect(function (client, mode) {
                     if (tracked[key]) { tracked[key].mode = Number(mode); }
                 });
@@ -343,23 +403,40 @@
         }
 
         function safeExecute(action, w) {
-            try { return execute(action, w); }
+            try { var result = execute(action, w); publish(); return result; }
             catch (error) { log(action + " failed: " + String(error)); return false; }
         }
 
         var removed = ws.windowRemoved || ws.clientRemoved;
         var added = ws.windowAdded || ws.clientAdded;
         if (removed) {
-            removed.connect(function (w) { delete states[id(w)]; delete tracked[id(w)]; });
+            removed.connect(function (w) {
+                delete states[id(w)]; delete tracked[id(w)];
+                if (lastWindow === w) { lastWindow = null; publish(); }
+            });
         }
         if (added) { added.connect(watch); }
         Array.prototype.forEach.call(plasma5 ? ws.clientList() : (ws.stackingOrder || []), watch);
+        if (plasma5 && ws.clientMaximizeSet) {
+            ws.clientMaximizeSet.connect(function (w, horizontal, vertical) {
+                if (tracked[id(w)]) { tracked[id(w)].mode = Number(vertical) + 2 * Number(horizontal); }
+            });
+        }
+        var activation = ws.windowActivated || ws.clientActivated;
+        if (activation) { activation.connect(activated); }
+        [ws.currentDesktopChanged, ws.currentActivityChanged, ws.screensChanged, ws.numberScreensChanged].forEach(function (signal) {
+            if (signal && env.callDBus) { signal.connect(function () { publish(); }); }
+        });
+        activated(plasma5 ? ws.activeClient : ws.activeWindow);
 
         ACTIONS.forEach(function (action) {
             if (env.registerShortcut("KRect-" + action[0], "KRect: " + action[1], action[2], function () {
                 safeExecute(action[0]);
             }) === false) { log("Could not register shortcut: " + action[0]); }
         });
+        if (env.callDBus) {
+            env.registerShortcut("KRect-app-command", "KRect: Desktop app connection", "", appCommand);
+        }
 
         if (env.registerUserActionsMenu) {
             env.registerUserActionsMenu(function (w) {
