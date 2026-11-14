@@ -1,12 +1,15 @@
 # KRect 0.1.0
 
-KDE Plasma 6에서 Rectangle처럼 단축키로 창을 배치하는 KWin 확장 프로토타입.
-Ubuntu에 KDE를 설치한 환경 또는 Kubuntu의 **Plasma 6 세션**을 대상으로 한다.
+KDE Plasma 5.27·6에서 Rectangle처럼 단축키로 창을 배치하는 KWin 확장 프로토타입.
+Ubuntu에 KDE를 설치한 환경 또는 Kubuntu의 **Plasma 5.27 / 6 세션**을 대상으로 한다.
 독립 창 관리자를 새로 실행하지 않고, 기존 KWin이 관리하는 활성 창을 조작한다.
 
-**상태:** 배치 계산·창 상태 처리의 Node 모의 테스트는 통과했다. 실제 KWin/Wayland/X11 세션,
-Qt 설정 화면, KPackage 설치는 이 제작 환경에서 실행하지 못했다. 실사용 검증 전 버전이다.
-GNOME과 Plasma 5는 대상이 아니다. 배포판 이름보다 `plasmashell --version`으로 확인한 Plasma 버전이 중요하다.
+**상태:** 자동 테스트 50개(Node 39개, Python 11개)를 통과했다. 현재 데스크톱의
+Plasma 5.27.12 / KWin 5.27.11 / X11에서 KPackage 설치, 실제 창 배치·순환·복원,
+가로/세로 듀얼 모니터 이동과 Qt 5 설정 폼 생성을 확인했다.
+Plasma 6 / Wayland의 실기 검증과 시스템 설정에서의 설정 저장은 아직 남아 있다.
+환경·배율과 설치 시도 결과는 [검증 기록](docs/VALIDATION.md#desktop-preflight-2026-11-14)에 있다.
+GNOME과 Plasma 5.26 이하는 대상이 아니다. 배포판 이름보다 `plasmashell --version`으로 확인한 Plasma 버전이 중요하다.
 
 ## 포함 기능
 
@@ -47,7 +50,9 @@ ZIP 파일을 내려받았다면 다음 순서를 따른다.
 3. **KRect**를 체크하고 **적용**한다. 설정 화면이 이미 열려 있었다면 다시 열어 목록을 새로고침한다.
 4. **키보드 → 단축키**에서 `KRect`를 검색한다. 버전에 따라 전역 단축키의 KWin 항목 안에 표시될 수 있다.
 
-설치에는 `kpackagetool6`가 필요하다. `sudo`로 설치 스크립트를 실행하지 않는다.
+설치 스크립트는 `plasmashell --version`을 확인해 Plasma 5.27에서는 `kpackagetool5`,
+Plasma 6에서는 `kpackagetool6`를 사용한다. 두 도구가 모두 설치돼 있어도 Plasma 버전에 맞춰 선택한다.
+`sudo`로 설치 스크립트를 실행하지 않는다.
 사용자 범위의 KPackage만 설치하며 설치 스크립트는 데스크톱 설정을 바꾸지 않는다.
 설치 위치는 보통 `~/.local/share/kwin/scripts/krect`이다.
 
@@ -91,6 +96,8 @@ KWin 스크립트 목록에서 KRect의 설정 버튼을 연다. 설정 UI는 �
 설정 저장 후 KRect를 해제/적용하고 다시 활성화/적용하면 확실하게 다시 읽는다.
 최대화는 KDE의 기본 최대화이며 간격을 적용하지 않는다.
 모니터 순서는 논리 좌표의 x, y, 이름 순으로 정렬하고 끝에서 순환한다.
+Plasma 5.27은 모니터 인덱스 API를 사용하고, 복원 대상은 화면 geometry로 식별한다.
+화면 위치·해상도·회전이 바뀌어 원래 geometry를 찾지 못하면 현재 화면에 맞춰 복원한다.
 
 복원은 **해당 창에 처음 KRect 명령을 적용하기 직전**의 배치를 기준으로 한다.
 다른 KRect 배치로 바꿔도 그 기준은 유지된다. 복원 후에는 기록을 지운다.
@@ -105,7 +112,7 @@ KWin 스크립트 목록에서 KRect의 설정 버튼을 연다. 설정 UI는 �
 - 전체 화면, 고정 크기 창, 패널, 메뉴, 최소화된 창, 이동/크기 변경 중인 창은 건드리지 않는다.
 - 창 배치 시 기존 타일 연결은 해제한다. 복원은 geometry와 확인 가능한 최대화 상태를 복구하며,
   원래 사용자 정의 타일 그룹 소속까지 복구하지는 않는다.
-- 초기 Plasma 6에는 현재 최대화 모드를 읽는 속성이 없다. 스크립트 시작 **전부터** 최대화된 창은
+- Plasma 5.27과 초기 Plasma 6에는 현재 최대화 모드를 읽는 속성이 없다. 스크립트 시작 **전부터** 최대화된 창은
   원래 화면 크기로는 복원되더라도 최대화 플래그까지 복구되지 않을 수 있다.
   모드를 읽을 수 있는 버전 또는 실행 중 관찰한 최대화 변경은 복원한다.
 - 디스플레이 배율을 geometry에 다시 곱하지 않는다. 혼합 배율, fractional scaling,
@@ -147,6 +154,9 @@ python3 tools/build.py
 추가 개발 순서로는 실제 KDE 통합 테스트, Qt/QML 트레이와 배치 선택 UI,
 드래그 스냅 영역·미리보기, 사용자 지정 배치 프리셋을 권장한다.
 
+현재 Ubuntu 24.04.5 데스크톱의 Plasma 6 업그레이드 검토는
+[docs/UPGRADE.md](docs/UPGRADE.md)에 있다.
+
 ## 구현 근거
 
 2026-11-14 확인. KWin 튜토리얼의 일부 예제는 Plasma 5 명칭을 사용하므로
@@ -154,6 +164,8 @@ python3 tools/build.py
 
 - [KDE: KWin scripting tutorial](https://develop.kde.org/docs/plasma/kwin/)
 - [KDE: KWin scripting API](https://develop.kde.org/docs/plasma/kwin/api/)
+- [KDE KWin Plasma 5.27 workspace API](https://github.com/KDE/kwin/blob/Plasma/5.27/src/scripting/workspace_wrapper.h)
+- [KDE KWin Plasma 5.27 window API](https://github.com/KDE/kwin/blob/Plasma/5.27/src/window.h)
 - [KDE KWin Plasma 6.0 window.h](https://github.com/KDE/kwin/blob/Plasma/6.0/src/window.h)
 - [KDE KWin Plasma 6.4 window.h](https://github.com/KDE/kwin/blob/Plasma/6.4/src/window.h)
 - [KDE KWin Plasma 6.4 tile API](https://github.com/KDE/kwin/blob/Plasma/6.4/src/tiles/tile.h)
