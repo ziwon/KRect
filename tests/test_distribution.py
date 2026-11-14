@@ -32,12 +32,14 @@ class InstallerTests(unittest.TestCase):
         self.base = Path(self.directory.name)
         self.project = self.base / "project with spaces"
         shutil.copytree(ROOT / "package", self.project / "package")
+        (self.project / "tools").mkdir()
+        shutil.copy(ROOT / "tools/plasma-tools.sh", self.project / "tools/plasma-tools.sh")
         for name in ["install.sh", "uninstall.sh"]:
             shutil.copy(ROOT / name, self.project / name)
         self.bin = self.base / "bin"
         self.bin.mkdir()
         self.log = self.base / "calls.jsonl"
-        for name in ["kpackagetool6", "kwriteconfig6", "qdbus6"]:
+        for name in ["kpackagetool5", "kwriteconfig5", "qdbus5", "kpackagetool6", "kwriteconfig6", "qdbus6"]:
             tool = self.bin / name
             tool.write_text('''#!/usr/bin/env python3
 import json, os, sys
@@ -51,6 +53,12 @@ sys.exit(91 if os.environ.get("KRECT_FAIL_TOOL") == name else 0)
         self.data = self.base / "data home"
         self.env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}",
                         XDG_DATA_HOME=str(self.data), KRECT_TEST_LOG=str(self.log))
+        self.plasma_version("6.4.0")
+
+    def plasma_version(self, version):
+        tool = self.bin / "plasmashell"
+        tool.write_text(f"#!/bin/sh\nprintf '%s\\n' 'plasmashell {version}'\n")
+        tool.chmod(0o755)
 
     def run_script(self, script, *args):
         return subprocess.run(["bash", str(self.project / script), *args],
@@ -72,6 +80,21 @@ sys.exit(91 if os.environ.get("KRECT_FAIL_TOOL") == name else 0)
         result = self.run_script("install.sh")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--upgrade", self.calls()[0])
+
+    def test_plasma5_selects_matching_tools_even_when_plasma6_tools_exist(self):
+        self.plasma_version("5.27.12")
+        self.assertEqual(self.run_script("install.sh").returncode, 0)
+        self.assertEqual(self.run_script("uninstall.sh").returncode, 0)
+        self.assertEqual([call[0] for call in self.calls()],
+                         ["kpackagetool5", "kwriteconfig5", "qdbus5", "kpackagetool5"])
+
+    def test_unsupported_plasma_does_not_mutate(self):
+        for version in ["5.26.5", "4.11.0", "7.0.0", "unknown"]:
+            with self.subTest(version=version):
+                self.plasma_version(version)
+                self.assertNotEqual(self.run_script("install.sh").returncode, 0)
+                self.assertNotEqual(self.run_script("uninstall.sh").returncode, 0)
+                self.assertEqual(self.calls(), [])
 
     def test_install_failure_does_not_report_success(self):
         self.env["KRECT_FAIL_TOOL"] = "kpackagetool6"

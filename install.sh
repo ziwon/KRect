@@ -13,22 +13,22 @@ if [[ $EUID -eq 0 ]]; then
     printf '%s\n' 'Run this as your desktop user, without sudo.' >&2
     exit 1
 fi
-if ! command -v kpackagetool6 >/dev/null 2>&1; then
-    printf '%s\n' 'kpackagetool6 was not found. KRect requires KDE Plasma 6.' \
-        'On Kubuntu with Plasma 6, install the kpackagetool6 package first.' >&2
+krect_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$krect_root/tools/plasma-tools.sh"
+if ! command -v "$krect_package_tool" >/dev/null 2>&1; then
+    printf 'Missing required command for Plasma %s: %s\n' "$krect_major" "$krect_package_tool" >&2
     exit 1
 fi
 
-krect_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 krect_data="${XDG_DATA_HOME:-$HOME/.local/share}"
 if [[ ! -f "$krect_root/package/contents/code/main.js" ]]; then
     printf '%s\n' 'Package is not built. Run python3 tools/build.py first.' >&2
     exit 1
 fi
 if [[ -f "$krect_data/kwin/scripts/krect/metadata.json" ]]; then
-    kpackagetool6 --type=KWin/Script --upgrade "$krect_root/package"
+    "$krect_package_tool" --type=KWin/Script --upgrade "$krect_root/package"
 else
-    kpackagetool6 --type=KWin/Script --install "$krect_root/package"
+    "$krect_package_tool" --type=KWin/Script --install "$krect_root/package"
 fi
 
 printf '%s\n' \
