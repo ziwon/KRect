@@ -55,6 +55,16 @@ The scale set is managed in `ziwon/homelab`'s
 `platform/stacks/01-platforms/overlays/home/arc.yaml` through Argo CD. A reference
 copy is [ci/arc-krect.yaml](ci/arc-krect.yaml). Without this scale set jobs queue.
 
+The shared `managed-github-auth-ziwon` secret authenticates the existing
+`restack-ai` GitHub App. Its selected-repository installation must include
+`ziwon/KRect`; the account owner can add it at
+[installation settings](https://github.com/settings/installations/96095281).
+Keep the existing repository selections. An Argo CD `Synced / Healthy` state
+only confirms the Kubernetes resources: a registration-token HTTP 404 in the
+ARC controller logs means GitHub access still needs checking. The current
+GitHub CLI OAuth token cannot change this installation's repository selection
+(HTTP 403), so that configuration step requires the owner's installation UI.
+
 KRect needs Docker-in-Docker for its Ubuntu job containers. The template follows
 the existing homelab DinD runner pattern, scales from zero to one runner, bounds
 scratch storage, and grants no additional cluster RBAC. Each validation/release
