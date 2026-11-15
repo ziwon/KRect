@@ -187,7 +187,7 @@
             if (!env.callDBus) { return; }
             var w = appTarget();
             var output = w ? screenFor(w) : null;
-            var status = { protocol: 1, version: "0.4.0-rc.1", snapBar: 1, snapAssist: 1, windowSwap: 1, workspacePresets: 1,
+            var status = { protocol: 1, version: "0.4.0-rc.2", snapBar: 1, snapAssist: 1, windowSwap: 1, workspacePresets: 1,
                 desktops: desktopList().map(desktopInfo), currentDesktop: desktopKey(ws.currentDesktop), activity: String(ws.currentActivity || ""), target: w ? {
                 id: id(w), caption: String(w.caption || w.resourceClass || "Window"),
                 application: String(w.desktopFileName || w.resourceClass || ""),

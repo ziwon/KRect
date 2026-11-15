@@ -1,10 +1,10 @@
 # Validation notes
 
-Date: 2026-11-16. Development: workspace presets and window swap (unreleased).
-Published prerelease: 0.4.0-rc.1 second-window suggestions and About.
+Date: 2026-11-16. Release candidate: 0.4.0-rc.2 workspace presets and window swap.
+Previous prerelease: 0.4.0-rc.1 second-window suggestions and About.
 Older release sections below retain their historical results and limitations.
 
-## Workspace presets — unreleased
+## Workspace presets — 0.4.0-rc.2
 
 The Workspaces tab captures one or all virtual desktops in the current KDE
 activity. Presets retain app identity, title/role, desktop/output, geometry/work
@@ -65,7 +65,7 @@ Native restoration observed on 2026-11-16:
 
 API reference: [KDE KWin scripting API](https://develop.kde.org/docs/plasma/kwin/api/).
 
-## Window swap — unreleased
+## Window swap — 0.4.0-rc.2 experimental
 
 The app/tray and assignable shortcuts offer a chooser for exchanging the position
 and size of two compatible normal windows on the same monitor, desktop and

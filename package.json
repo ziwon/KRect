@@ -1,6 +1,6 @@
 {
   "name": "krect",
-  "version": "0.4.0-rc.1",
+  "version": "0.4.0-rc.2",
   "private": true,
   "description": "KWin window placement for KDE Plasma 5.27 and 6",
   "license": "MIT",
