@@ -120,6 +120,9 @@ jobs:
     runs-on: krect
     container: ubuntu:24.04
     timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: write
     steps:
