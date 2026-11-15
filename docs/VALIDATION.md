@@ -1,6 +1,6 @@
 # Validation notes
 
-Date: 2026-11-15. Development: workspace presets and window swap (unreleased).
+Date: 2026-11-16. Development: workspace presets and window swap (unreleased).
 Published prerelease: 0.4.0-rc.1 second-window suggestions and About.
 Older release sections below retain their historical results and limitations.
 
@@ -38,10 +38,30 @@ Observed on 2026-11-15:
   shortcuts or changing the installed app. Schema validation passed. The probe
   unloads its temporary script and writes only desktop names/counts to
   `dist/workspace-probe-results.json`.
-- **Real restoration and app launching remain pending**, as do relogin timing,
-  mixed scaling/hotplug and Plasma 6/Wayland. The user currently has terminal-only
-  access. No production presets have been saved or applied; installed RC1 remains
-  in use. Unknown initial Plasma 5 maximize mode falls back to frame restoration.
+
+Native restoration observed on 2026-11-16:
+
+- `/usr/bin/python3 -B tools/validate_workspaces_x11.py` passed **three live
+  Plasma 5.27/X11 scenarios**, each restoring four disposable windows across
+  D1–D4 and the 3840 × 2160 landscape / 2160 × 3840 portrait displays.
+- Manual restore and the scheduled startup callback restored persisted presets
+  after deliberately changing every test window's desktop, monitor and frame.
+  A third pass marked presets as belonging to a previous engine session to force
+  app/title matching rather than same-session IDs. This is not a real relogin.
+- Independent KWin reads matched every saved frame, desktop, output and minimized
+  state exactly; X11 properties confirmed both maximize axes. The current desktop,
+  active window and other normal windows' frames/desktops/states stayed unchanged.
+- The harness used the production controller, store, command/reply handling and
+  unmodified engine, with only transport and the client list isolated. Presets
+  were written to a temporary mode-0600 file. It sent no mouse/keyboard input,
+  registered no shortcuts and did not install or replace the production engine.
+  Cleanup confirmed all test windows closed, the test script unloaded, and the
+  installed RC1 script retained. Evidence: `dist/workspace-validation/results.json`.
+- **Actual relogin, new application processes, optional missing-app launching,
+  mixed scaling/hotplug and Plasma 6/Wayland remain unverified.** The live startup
+  check exercised the timer/controller in the current session. Unknown initial
+  Plasma 5 maximize mode still falls back to frame restoration. No production
+  presets have been saved or applied; installed RC1 remains in use.
 
 API reference: [KDE KWin scripting API](https://develop.kde.org/docs/plasma/kwin/api/).
 
