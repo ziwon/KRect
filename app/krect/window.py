@@ -1,6 +1,7 @@
 """Theme-respecting Qt window and native tray menu."""
 from . import VERSION
 from .about import AboutDialog
+from .workspace_page import WorkspacePage
 from .model import ACTIONS, LABELS, fraction, tr
 from .qt import Action, QtCore as C, QtGui as G, QtWidgets as W, QT_MAJOR, Signal
 
@@ -192,6 +193,8 @@ class Window(W.QMainWindow):
         self.tabs.addTab(self.layouts_tab(), tr("Layouts", "창 배치"))
         self.tabs.addTab(self.shortcuts_tab(), tr("Shortcuts", "단축키"))
         self.tabs.addTab(self.preferences_tab(), tr("Preferences", "환경설정"))
+        self.workspace_page = WorkspacePage(backend)
+        self.tabs.addTab(self.workspace_page, tr("Workspaces", "작업 공간"))
         self.tabs.currentChanged.connect(self.tab_changed)
         outer.addWidget(self.tabs, 1)
         self.feedback = text_label("", True)

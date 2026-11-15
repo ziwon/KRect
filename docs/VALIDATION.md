@@ -1,8 +1,49 @@
 # Validation notes
 
-Date: 2026-11-15. Development: window swap (unreleased).
+Date: 2026-11-15. Development: workspace presets and window swap (unreleased).
 Published prerelease: 0.4.0-rc.1 second-window suggestions and About.
 Older release sections below retain their historical results and limitations.
+
+## Workspace presets — unreleased
+
+The Workspaces tab captures one or all virtual desktops in the current KDE
+activity. Presets retain app identity, title/role, desktop/output, geometry/work
+area and available maximize/minimize state. Atomic local storage uses mode 0600;
+a corrupt or unsupported file is preserved rather than silently replaced.
+Startup restoration is per preset, waits up to 30 seconds for late windows, and
+applies each matched window once. Optional app launching uses installed desktop
+entries through GIO, never a captured caption or process command line.
+
+Matching prefers a live-session window ID, then exact app/title and desktop
+affinity. App-only fallback requires one saved and one available window. Ambiguous
+windows, missing desktops and other activities are skipped with visible results.
+KWin validates a fresh expected frame before each placement and waits for actual
+geometry. Refused placement attempts to roll back that window. Completed windows
+remain in place when the user stops restoration; the current desktop is not set.
+
+Observed on 2026-11-15:
+
+- **136 automated tests passed:** 91 Node and 45 Python, including eight new
+  engine scenarios, nine persistence/matching cases and seven controller/Qt UI
+  cases. Both mocked Plasma APIs restore D1–D4; tests cover atomic-write failure,
+  ambiguous windows, late app windows, launch-once behavior, startup selection,
+  stopping, missing outputs, stale requests and refused geometry.
+- Qt 5.15.13 constructed the new tab in the Korean app smoke test. The native
+  offscreen page test saved a desktop name/options and captured its snapshot.
+- Ubuntu 26.04 / **Qt 6.10.2** passed Korean/English app smoke checks and the seven
+  workspace controller/page tests, plus the existing chooser/snap-bar tests.
+  This container check does not establish native compositor restoration.
+- `/usr/bin/python3 -B tools/inspect_workspaces.py` read **four real Plasma 5
+  desktops and six eligible windows** without moving windows, registering
+  shortcuts or changing the installed app. Schema validation passed. The probe
+  unloads its temporary script and writes only desktop names/counts to
+  `dist/workspace-probe-results.json`.
+- **Real restoration and app launching remain pending**, as do relogin timing,
+  mixed scaling/hotplug and Plasma 6/Wayland. The user currently has terminal-only
+  access. No production presets have been saved or applied; installed RC1 remains
+  in use. Unknown initial Plasma 5 maximize mode falls back to frame restoration.
+
+API reference: [KDE KWin scripting API](https://develop.kde.org/docs/plasma/kwin/api/).
 
 ## Window swap — unreleased
 

@@ -11,11 +11,17 @@ from .window import Window
 class OfflineBackend(C.QObject):
     changed = Signal(dict)
     message = Signal(str, bool)
+    workspace_result = Signal(dict)
     major = 6 if C.QT_VERSION_STR.startswith("6") else 5
     enabled = False
     status = {}
     pending = None
     values = DEFAULTS.copy()
+
+    def __init__(self):
+        super().__init__()
+        from .workspace_controller import WorkspaceController
+        self.workspaces = WorkspaceController(self, "/nonexistent/krect-smoke/workspaces.json")
 
     def autostart_path(self):
         return Path("/nonexistent/krect-smoke/autostart.desktop")

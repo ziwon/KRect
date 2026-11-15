@@ -161,6 +161,8 @@
         var pairPlacement = null;
         var assistTimer = snapTimer ? env.createTimer() : null;
         var swapPlacement = null, swapUndo = null;
+        var workspaceTimer = snapTimer ? env.createTimer() : null, workspaceRestore = null;
+        var workspaceSession = String(now()) + "-" + Math.random().toString(36).slice(2);
 
         function ownWindow(w) {
             return w && [w.resourceClass, w.resourceName, w.desktopFileName].some(function (value) {
@@ -185,7 +187,8 @@
             if (!env.callDBus) { return; }
             var w = appTarget();
             var output = w ? screenFor(w) : null;
-            var status = { protocol: 1, version: "0.4.0-rc.1", snapBar: 1, snapAssist: 1, windowSwap: 1, target: w ? {
+            var status = { protocol: 1, version: "0.4.0-rc.1", snapBar: 1, snapAssist: 1, windowSwap: 1, workspacePresets: 1,
+                desktops: desktopList().map(desktopInfo), currentDesktop: desktopKey(ws.currentDesktop), activity: String(ws.currentActivity || ""), target: w ? {
                 id: id(w), caption: String(w.caption || w.resourceClass || "Window"),
                 application: String(w.desktopFileName || w.resourceClass || ""),
                 geometry: rect(w.frameGeometry), area: areaFor(output, w), screen: name(output),
@@ -217,6 +220,13 @@
                 try {
                     var command = JSON.parse(String(raw || "{}"));
                     if (!command.token) { publish(); return; }
+                    if (command.kind === "workspace-snapshot") {
+                        publish({ token: command.token, success: true, snapshot: workspaceSnapshot() }); return;
+                    }
+                    if (command.kind === "workspace-restore") { restoreWorkspace(command); return; }
+                    if (command.kind === "workspace-cancel") {
+                        cancelWorkspace(); publish({ token: command.token, success: true }); return;
+                    }
                     if (command.kind === "assist") {
                         var accepted = assistCommand(command);
                         if (accepted !== null) { publish({ token: command.token, success: accepted, quiet: !command.target }); }
@@ -247,9 +257,9 @@
         function name(output) { return output ? String(output.name) : ""; }
         function log(message) { if (env.log) { env.log(message); } }
 
-        function eligible(w, opts, allowMove) {
+        function eligible(w, opts, allowMove, allowMinimized) {
             if (!w || ownWindow(w) || w.deleted || !w.managed || !(w.normalWindow || w.dialog) ||
-                    w.fullScreen || w.specialWindow || w.minimized || w.shade || (w.move && !allowMove) || w.resize ||
+                    w.fullScreen || w.specialWindow || (w.minimized && !allowMinimized) || w.shade || (w.move && !allowMove) || w.resize ||
                     !w.moveable || !w.resizeable || !valid(w.frameGeometry)) {
                 return false;
             }
@@ -259,8 +269,8 @@
             return !opts.ignored.some(function (s) { return identifiers.indexOf(s) !== -1; });
         }
 
-        function areaFor(output, w) {
-            var area = output ? ws.clientArea(env.KWin.MaximizeArea, plasma5 ? output.index : output, ws.currentDesktop) :
+        function areaFor(output, w, desktop) {
+            var area = output ? ws.clientArea(env.KWin.MaximizeArea, plasma5 ? output.index : output, desktop === undefined ? ws.currentDesktop : desktop) :
                 ws.clientArea(env.KWin.MaximizeArea, w);
             return valid(area) ? rect(area) : null;
         }
@@ -296,6 +306,154 @@
                 if (name(screens[i]) === outputName) { return screens[i]; }
             }
             return null;
+        }
+
+        function desktopKey(value) { return plasma5 ? String(value) : String(value && value.id || ""); }
+
+        function desktopList() {
+            var list = [];
+            if (plasma5) {
+                var count = typeof ws.desktops === "number" ? ws.desktops : 1;
+                for (var n = 1; n <= Math.min(count, 64); n++) {
+                    list.push({ value: n, id: String(n), number: n,
+                        name: typeof ws.desktopName === "function" ? String(ws.desktopName(n)) : "Desktop " + n });
+                }
+            } else {
+                Array.prototype.forEach.call(ws.desktops || [], function (d, index) {
+                    list.push({ value: d, id: String(d.id), number: index + 1, name: String(d.name || "Desktop " + (index + 1)) });
+                });
+            }
+            return list;
+        }
+
+        function desktopInfo(d) { return { id: d.id, number: d.number, name: d.name }; }
+        function findDesktop(key) { return desktopList().filter(function (d) { return d.id === key; })[0]; }
+        function windowDesktop(w) {
+            if (plasma5) { return w.desktop > 0 ? String(w.desktop) : ""; }
+            return w.desktops && w.desktops.length === 1 ? desktopKey(w.desktops[0]) : "";
+        }
+        function setDesktop(w, d) { if (plasma5) { w.desktop = d.value; } else { w.desktops = [d.value]; } }
+        function allWindows() { return Array.prototype.slice.call(plasma5 ? ws.clientList() : ws.stackingOrder || []); }
+        function sameActivity(w) {
+            return !w.activities || !w.activities.length || !ws.currentActivity ||
+                Array.prototype.indexOf.call(w.activities, ws.currentActivity) !== -1;
+        }
+        function workspaceEligible(w) {
+            return eligible(w, settings(), false, true) && tracked[id(w)] && w.normalWindow && !w.dialog &&
+                !w.tile && sameActivity(w) && Boolean(windowDesktop(w)) && Boolean(w.desktopFileName || w.resourceClass);
+        }
+        function workspaceWindow(w) {
+            var d = findDesktop(windowDesktop(w)), output = screenFor(w), area = d && areaFor(output, w, d.value);
+            if (!area) { return null; }
+            var mode = maxMode(w);
+            if (mode === null || mode === undefined) {
+                mode = Number(Boolean(w.maximizedVertically)) + 2 * Number(Boolean(w.maximizedHorizontally));
+            }
+            return { id: id(w), application: String(w.desktopFileName || "").slice(0, 512),
+                resourceClass: String(w.resourceClass || "").slice(0, 512), role: String(w.windowRole || "").slice(0, 512),
+                caption: String(w.caption || "").slice(0, 512), desktop: d.id, output: name(output),
+                geometry: rect(w.frameGeometry), area: area, mode: mode, minimized: Boolean(w.minimized) };
+        }
+        function workspaceSnapshot() {
+            var windows = allWindows(), saved = windows.filter(workspaceEligible).map(workspaceWindow).filter(Boolean);
+            var running = [];
+            windows.filter(function (w) { return !ownWindow(w) && sameActivity(w); }).forEach(function (w) {
+                running.push(String(w.desktopFileName || ""), String(w.resourceClass || ""));
+            });
+            return { schema: 1, session: workspaceSession, activity: String(ws.currentActivity || ""),
+                currentDesktop: desktopKey(ws.currentDesktop), desktops: desktopList().map(desktopInfo),
+                windows: saved.slice(0, 256), truncated: saved.length > 256,
+                runningApplications: running.filter(Boolean) };
+        }
+        function strictGeometry(g) {
+            return valid(g) && ["x", "y", "width", "height"].every(function (k) {
+                return typeof g[k] === "number" && Math.abs(g[k]) <= 1000000;
+            });
+        }
+        function rollbackWorkspace(entry) {
+            var w = entry.window, before = entry.before, d = findDesktop(before.desktop), output = findScreen(before.output);
+            if (!workspaceEligible(w) || !d || !output || !near(areaFor(output, w, d.value), before.area, 0)) { return; }
+            try {
+                w.minimized = false; setDesktop(w, d); place(w, before.geometry, output);
+                w.setMaximize(Boolean(before.mode & 1), Boolean(before.mode & 2)); w.minimized = before.minimized;
+            } catch (error) { log("Workspace rollback failed: " + String(error)); }
+        }
+        function finishWorkspace(p) {
+            workspaceRestore = null; workspaceTimer.stop();
+            publish({ token: p.token, success: true, rows: p.rows });
+        }
+        function cancelWorkspace() {
+            var p = workspaceRestore;
+            if (!p) { return; }
+            p.entries.forEach(function (entry) {
+                rollbackWorkspace(entry); p.rows.push({ key: entry.key, id: id(entry.window), status: "cancelled" });
+            });
+            finishWorkspace(p);
+        }
+        function checkWorkspace() {
+            var p = workspaceRestore;
+            if (!p) { return; }
+            p.entries = p.entries.filter(function (entry) {
+                var w = entry.window, output = findScreen(entry.output), d = findDesktop(entry.desktop);
+                var validContext = p.activity === String(ws.currentActivity || "") && workspaceEligible(w) && d && output &&
+                    near(areaFor(output, w, d.value), entry.area, 0);
+                if (validContext && windowDesktop(w) === entry.desktop && name(screenFor(w)) === entry.output &&
+                        near(w.frameGeometry, entry.target, 2) && (maxMode(w) === null || maxMode(w) === undefined || maxMode(w) === entry.mode)) {
+                    var state = states[id(w)] || { original: { geometry: entry.before.geometry, area: entry.before.area,
+                        output: entry.before.output, desktop: entry.before.desktop, mode: entry.before.mode }, last: null };
+                    states[id(w)] = state;
+                    remember(state, "workspace", 0, entry.target, entry.before.geometry, output, entry.area);
+                    w.minimized = entry.minimized;
+                    p.rows.push({ key: entry.key, id: id(w), status: "restored", fallback: entry.fallback });
+                    return false;
+                }
+                if (!validContext || now() - p.created >= 1800) {
+                    rollbackWorkspace(entry); p.rows.push({ key: entry.key, id: id(w), status: "failed" }); return false;
+                }
+                return true;
+            });
+            if (!p.entries.length) { finishWorkspace(p); }
+        }
+        function restoreWorkspace(command) {
+            var seen = Object.create(null), placements = command.placements;
+            if (!workspaceTimer || workspaceRestore || command.session !== workspaceSession ||
+                    command.activity !== String(ws.currentActivity || "") || !Array.isArray(placements) || placements.length > 256 ||
+                    !placements.every(function (e) {
+                        if (!e || typeof e.key !== "string" || typeof e.id !== "string" || seen[e.id] || !e.saved || !e.expected) { return false; }
+                        seen[e.id] = true;
+                        return e.expected.id === e.id && strictGeometry(e.expected.geometry) && strictGeometry(e.saved.geometry) &&
+                            strictGeometry(e.saved.area) && typeof e.saved.desktop === "string" && typeof e.saved.output === "string" &&
+                            typeof e.saved.mode === "number" && [0, 1, 2, 3].indexOf(e.saved.mode) !== -1 && typeof e.saved.minimized === "boolean";
+                    })) { publish({ token: command.token, success: false, error: "invalid-or-busy" }); return; }
+            cancelPair(true); cancelSwap(true); cancelAssist(false); cancelDrag(); swapUndo = null;
+            var p = { token: command.token, activity: command.activity, created: now(), rows: [], entries: [] };
+            var windows = allWindows();
+            placements.forEach(function (e) {
+                var w = windows.filter(function (candidate) { return id(candidate) === e.id; })[0];
+                var current = w && workspaceEligible(w) && workspaceWindow(w), d = findDesktop(e.saved.desktop);
+                if (!current || !d || current.application !== e.expected.application || current.resourceClass !== e.expected.resourceClass ||
+                        current.desktop !== e.expected.desktop || current.caption !== e.expected.caption ||
+                        current.mode !== e.expected.mode || current.minimized !== e.expected.minimized ||
+                        !near(current.geometry, e.expected.geometry, 2)) {
+                    p.rows.push({ key: e.key, id: e.id, status: "changed" }); return;
+                }
+                var output = findScreen(e.saved.output) || screenFor(w), area = areaFor(output, w, d.value);
+                if (!area) { p.rows.push({ key: e.key, id: e.id, status: "output-missing" }); return; }
+                var target = near(area, e.saved.area, 0) ? fit(e.saved.geometry, area) : mapRect(e.saved.geometry, e.saved.area, area);
+                if (e.saved.mode & 1) { target.y = area.y; target.height = area.height; }
+                if (e.saved.mode & 2) { target.x = area.x; target.width = area.width; }
+                if (!fitsAssist(w, target) || (e.saved.mode && !w.maximizable)) {
+                    p.rows.push({ key: e.key, id: e.id, status: "size-limit" }); return;
+                }
+                var entry = { key: e.key, window: w, before: current, desktop: d.id, output: name(output),
+                    area: area, target: target, mode: e.saved.mode, minimized: e.saved.minimized, fallback: name(output) !== e.saved.output };
+                try {
+                    w.minimized = false; setDesktop(w, d); place(w, target, output);
+                    w.setMaximize(Boolean(e.saved.mode & 1), Boolean(e.saved.mode & 2));
+                    p.entries.push(entry);
+                } catch (error) { rollbackWorkspace(entry); p.rows.push({ key: e.key, id: e.id, status: "failed" }); }
+            });
+            workspaceRestore = p; workspaceTimer.start(); checkWorkspace();
         }
 
         function sendAssist(payload) {
@@ -627,6 +785,7 @@
         }
 
         function beginDrag(w) {
+            cancelWorkspace();
             cancelPair(false);
             cancelSwap(true);
             if (swapUndo && swapUndo.entries.some(function (e) { return e.window === w; })) { swapUndo = null; }
@@ -678,6 +837,10 @@
         }
 
         if (snapTimer) {
+            workspaceTimer.interval = 100;
+            workspaceTimer.timeout.connect(function () {
+                try { checkWorkspace(); } catch (error) { log("Workspace restore failed: " + String(error)); cancelWorkspace(); }
+            });
             snapTimer.interval = 50;
             snapTimer.timeout.connect(updateDrag);
             dropTimer.singleShot = true; dropTimer.interval = 0;
@@ -793,11 +956,14 @@
             if (action === "restore") {
                 if (!state) { return false; }
                 var original = state.original;
+                var originalDesktop = original.desktop ? findDesktop(original.desktop) : null;
+                if (original.desktop && !originalDesktop) { return false; }
                 dest = findScreen(original.output) || output;
-                var restoreArea = areaFor(dest, w);
+                var restoreArea = areaFor(dest, w, originalDesktop ? originalDesktop.value : undefined);
                 if (!restoreArea) { return false; }
                 target = near(restoreArea, original.area, 0) ? fit(original.geometry, restoreArea) :
                     mapRect(original.geometry, original.area, restoreArea);
+                if (originalDesktop) { setDesktop(w, originalDesktop); }
                 place(w, target, dest);
                 if (typeof original.mode === "number" && original.mode !== 0) {
                     // KWin MaximizeVertical = 1; MaximizeHorizontal = 2.
@@ -871,6 +1037,7 @@
         }
 
         function safeExecute(action, w, token) {
+            cancelWorkspace();
             cancelPair(true);
             cancelSwap(true);
             cancelAssist(true);

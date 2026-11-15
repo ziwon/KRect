@@ -112,6 +112,7 @@ class DesktopBridge(QtCore.QObject):
 class Backend(QtCore.QObject):
     changed = Signal(dict)
     message = Signal(str, bool)
+    workspace_result = Signal(dict)
 
     def __init__(self, bridge, parent=None):
         super().__init__(parent)
@@ -120,6 +121,7 @@ class Backend(QtCore.QObject):
         self.status = {}
         self.enabled = False
         self.pending = None
+        self.pending_kind = None
         self.major = self.plasma_major()
         self.preferences = QtCore.QSettings("krect", "desktop")
         self.values = self.read_settings()
@@ -132,6 +134,8 @@ class Backend(QtCore.QObject):
         self.timeout.setSingleShot(True)
         self.timeout.setInterval(4000)
         self.timeout.timeout.connect(self.command_timeout)
+        from .workspace_controller import WorkspaceController
+        self.workspaces = WorkspaceController(self, CONFIG / "krect/workspaces.json")
 
     @staticmethod
     def plasma_major():
@@ -221,7 +225,7 @@ class Backend(QtCore.QObject):
                 self.start()
 
     def upgrade_connection(self):
-        if self.enabled and (self.status.get("version") != VERSION or self.status.get("snapBar") != 1 or self.status.get("snapAssist") != 1 or self.status.get("windowSwap") != 1):
+        if self.enabled and (self.status.get("version") != VERSION or self.status.get("snapBar") != 1 or self.status.get("snapAssist") != 1 or self.status.get("windowSwap") != 1 or self.status.get("workspacePresets") != 1):
             try:
                 self.start()
             except Exception as error:
@@ -238,9 +242,13 @@ class Backend(QtCore.QObject):
         self.changed.emit(self.status)
 
     def cancel_command(self):
+        workspace_pending = (self.pending_kind or "").startswith("workspace-")
         self.bridge.command = {}
         self.pending = None
+        self.pending_kind = None
         self.timeout.stop()
+        if workspace_pending:
+            self.workspace_result.emit(dict(success=False, error="cancelled"))
 
     def refresh(self):
         if not self.enabled or self.pending:
@@ -259,9 +267,13 @@ class Backend(QtCore.QObject):
         self.status = status
         result = status.get("result") or {}
         if self.pending and result.get("token") == self.pending:
+            workspace_pending = (self.pending_kind or "").startswith("workspace-")
             self.pending = None
+            self.pending_kind = None
             self.timeout.stop()
-            if not result.get("quiet"):
+            if workspace_pending:
+                self.workspace_result.emit(result)
+            elif not result.get("quiet"):
                 success_text = {"swap": tr("Windows swapped.", "두 창을 교환했어요."),
                                 "undo-swap": tr("Window swap undone.", "두 창을 교환 전 위치로 되돌렸어요.")}.get(
                                     result.get("operation"), tr("Placement applied.", "배치를 적용했어요."))
@@ -282,6 +294,7 @@ class Backend(QtCore.QObject):
 
     def submit(self, command):
         self.pending = uuid.uuid4().hex
+        self.pending_kind = command.get("kind")
         self.bridge.command = dict(command, token=self.pending)
         try:
             self.invoke("app-command")
@@ -292,8 +305,13 @@ class Backend(QtCore.QObject):
             self.message.emit(str(error), True)
 
     def command_timeout(self):
+        workspace_pending = (self.pending_kind or "").startswith("workspace-")
         self.bridge.command = {}
         self.pending = None
+        self.pending_kind = None
+        self.timeout.stop()
+        if workspace_pending:
+            self.workspace_result.emit(dict(success=False, error="timeout"))
         self.message.emit(tr("KWin did not respond. Switch KRect off and on, then try again.", "KWin 응답이 없어요. KRect를 껐다 켠 뒤 다시 시도하세요."), True)
         self.changed.emit(self.status)
 

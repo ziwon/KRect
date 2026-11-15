@@ -84,7 +84,7 @@ def build(ubuntu, output):
             "Section: kde\nPriority: optional\nArchitecture: all\n"
             "Maintainer: KRect contributors <ziwon@users.noreply.github.com>\n"
             f"Installed-Size: {(size + 1023) // 1024}\n"
-            f"Depends: python3, python3-dbus, python3-pyqt{major}, {svg_dependencies}, "
+            f"Depends: python3, python3-dbus, python3-pyqt{major}, {svg_dependencies}, libglib2.0-bin, "
             f"kpackagetool{major}, libkf{major}config-bin, kde-cli-tools, kwin-common (>= {minimum}), "
             f"kwin-common (<< {maximum}), plasma-workspace (>= {minimum}), "
             f"plasma-workspace (<< {maximum})\n"
