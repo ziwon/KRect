@@ -35,6 +35,8 @@ It works with your existing KWin session, using KDE's work areas and global shor
 
 **0.3.1 update:** fixes snap bars that disappear or become covered by other windows. [Release notes](https://github.com/ziwon/KRect/releases/tag/v0.3.1)
 
+**Prerelease [0.4.0-rc.1](https://github.com/ziwon/KRect/releases/tag/v0.4.0-rc.1):** try second-window suggestions after a half snap and the About/version dialog. The stable release remains 0.3.1; live Plasma 6/Wayland testing of the RC is still pending.
+
 ## Drag, choose, and drop
 
 **Since 0.3.0, drag a window to the top of a display to arrange it.**

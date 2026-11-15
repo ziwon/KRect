@@ -36,11 +36,18 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           python3 - <<'PY'
-          import json, os
+          import json, os, re
           from pathlib import Path
+          from tools.build_deb import debian_version
           version = json.loads(Path('package/metadata.json').read_text())['KPlugin']['Version']
+          debian_version(version, '24.04')
           assert json.loads(Path('package.json').read_text())['version'] == version
-          assert json.loads(Path('site/config.json').read_text())['release'] == version
+          stable = json.loads(Path('site/config.json').read_text())['release']
+          if '-rc.' in version:
+              assert re.fullmatch(r'\d+\.\d+\.\d+', stable), 'Landing page must point to a stable release'
+              assert tuple(map(int, stable.split('.'))) < tuple(map(int, version.split('-')[0].split('.')))
+          else:
+              assert stable == version
           assert f'VERSION = "{version}"' in Path('app/krect/__init__.py').read_text()
           assert f'version: "{version}"' in Path('src/main.js').read_text()
           if os.environ['REF_TYPE'] == 'tag':
@@ -99,6 +106,8 @@ jobs:
           python3 tools/build_deb.py --ubuntu "$UBUNTU_VERSION"
           lintian --fail-on error dist/*.deb
           bash tools/smoke-deb.sh dist/*.deb "$PLASMA_MAJOR"
+          QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests -p 'test_assist.py' -v
+          QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests -p 'test_snap.py' -v
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deb-ubuntu-${{ matrix.ubuntu }}
@@ -133,7 +142,13 @@ jobs:
           notes_file="../docs/releases/${RELEASE_TAG#v}.md"
           test -f "$notes_file" || { echo "Missing bilingual release notes: $notes_file" >&2; exit 1; }
           sha256sum -- *.deb *.kwinscript *.zip > SHA256SUMS
+          release_flags=()
+          if [[ "$RELEASE_TAG" == *-rc.* ]]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --verify-tag --notes-file "$notes_file" --title "KRect $RELEASE_TAG"
+            gh release create "$RELEASE_TAG" --verify-tag --notes-file "$notes_file" --title "KRect $RELEASE_TAG" "${release_flags[@]}"
+          elif [[ "$RELEASE_TAG" == *-rc.* ]]; then
+            gh release edit "$RELEASE_TAG" --prerelease --latest=false
           fi
           gh release upload "$RELEASE_TAG" --clobber -- *.deb *.kwinscript *.zip SHA256SUMS

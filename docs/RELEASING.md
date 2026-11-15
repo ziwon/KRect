@@ -99,10 +99,18 @@ publication uses the workflow's `GITHUB_TOKEN`.
 
 ## Publish a version
 
-Set the same numeric `major.minor.patch` version in `package/metadata.json`,
+Set the same `major.minor.patch` or `major.minor.patch-rc.N` version in `package/metadata.json`,
 `package.json`, and `app/krect/__init__.py`. Update the engine's published version
 in `src/main.js`. Rebuild and commit the generated entry point and release changes.
 The tag must exactly match `v` plus that version; a mismatch fails validation.
+
+Release candidates use Debian's tilde ordering: `0.4.0-rc.1` builds
+`krect_0.4.0~rc.1-1ubuntu24.04_all.deb`. This sorts after 0.3.1 and before the
+final 0.4.0 package, allowing a normal upgrade. RC tags are published with
+`--prerelease --latest=false`, including reruns. Keep `site/config.json` pointing
+to the previous stable version during RC releases; the public landing page and
+default README downloads continue to serve that stable release. Add a separate
+RC link to each README language. Final releases still require site/package parity.
 
 Write release notes in `docs/releases/<version>.md` with Korean first and English
 second. Keep the changes, installation instructions, and validation limits aligned

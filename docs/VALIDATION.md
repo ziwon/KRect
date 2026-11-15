@@ -1,9 +1,24 @@
 # Validation notes
 
-Date: 2026-11-15. Release: 0.3.1 snap bar visibility and stacking fixes.
+Date: 2026-11-15. Prerelease: 0.4.0-rc.1 second-window suggestions and About.
 Older release sections below retain their historical results and limitations.
 
-## Second-window suggestions — unreleased
+## Release candidate packaging and Qt 6
+
+Ubuntu 26.04's Qt 6.10.2 passed the Korean and English native offscreen smoke
+checks, including the About version and second-window chooser. Its six chooser
+tests and three snap-bar tests also passed without skips. The disposable container
+mounted the checkout read-only and did not modify the host desktop. The package
+smoke check now exercises both languages, and each Ubuntu CI job runs these nine
+UI tests against its own Qt generation.
+
+RC package versions use `~rc.N` so Debian upgrades from 0.3.1 through the RC to
+the final release in the intended order. The workflow marks RCs as prereleases,
+keeps them out of Latest, and permits the landing page to retain stable 0.3.1.
+Live Plasma 6/Wayland remains pending; an offscreen Qt 6 pass is not compositor
+validation. The tag workflow separately verifies package installation/removal.
+
+## Second-window suggestions — 0.4.0-rc.1
 
 The development build offers a native chooser after dragging a window into a
 left/right/top/bottom half. The engine supplies eligible candidates from the same
@@ -22,7 +37,7 @@ occupied matching half suppress the chooser.
 
 Observed checks on 2026-11-15:
 
-- **100 automated tests** passed without skips: 73 Node and 27 Python. These cover
+- **101 automated tests** passed without skips: 73 Node and 28 Python. These cover
   both mocked Plasma APIs, all four half directions, stale/closed candidates,
   context and geometry changes, delayed frame acknowledgements, restoring both
   windows, Qt mouse/keyboard input, dismissal, heartbeat replay and malformed
@@ -54,17 +69,17 @@ its automatic restore completed successfully. A compact widget inspection found
 that 248 × 188 was below Qt's minimum usable height; the engine's small-region
 gate was raised, and 328 × 288 and 480 × 400 renders fit.
 
-Still pending: real Plasma 6/Wayland, Qt 6 construction for this new chooser,
+Still pending: real Plasma 6/Wayland,
 mixed scale/hotplug and unusually large UI fonts or restrictive candidate size
 hints. Node mocks and Qt 5 widget checks do not establish those environments.
-This is development source, not part of the published 0.3.1 release.
+This feature is included in the 0.4.0-rc.1 prerelease, not in stable 0.3.1.
 
-## About — unreleased
+## About — 0.4.0-rc.1
 
 The development app has an About dialog accessible from the footer and the tray.
 Its selectable version comes from `krect.VERSION`, the same source as the CLI,
 application metadata and footer. It includes website, source and license links,
-with Korean and English labels. This change is planned for the next window-management release and
+with Korean and English labels. This change ships in the 0.4.0-rc.1 prerelease and
 is not part of the published 0.3.1 package.
 
 The Qt 5 offscreen construction check passed in both languages:
@@ -78,8 +93,8 @@ and English Capture tab with the new footer button were visually checked.
 
 The offscreen backend emits its known tray-signal, size-hint and raise warnings;
 the checks exit successfully. These are widget checks, not proof of compositor
-stacking or live capture. Qt 6 is not installed in the local Python environment,
-so this About change has not yet been checked on Qt 6 or a live Wayland session.
+stacking or live capture. Qt 6 was subsequently checked in the Ubuntu 26.04
+container described above; a live Wayland session has not been checked.
 The installed app and running KWin engine were not replaced.
 
 ## Native capture — unreleased prototype

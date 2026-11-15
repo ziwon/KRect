@@ -16,13 +16,17 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {"24.04": (5, "4:5.27", "4:6~"), "26.04": (6, "4:6.0", "4:7~")}
 
 
+def debian_version(version, ubuntu):
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[1-9][0-9]*)?", version):
+        raise ValueError("Package version must be major.minor.patch or major.minor.patch-rc.N")
+    return f"{version.replace('-rc.', '~rc.')}-1ubuntu{ubuntu}"
+
+
 def build(ubuntu, output):
     major, minimum, maximum = TARGETS[ubuntu]
     metadata = json.loads((ROOT / "package/metadata.json").read_text())
     version = metadata["KPlugin"]["Version"]
-    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-        raise ValueError("Package version must be a numeric major.minor.patch")
-    deb_version = f"{version}-1ubuntu{ubuntu}"
+    deb_version = debian_version(version, ubuntu)
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "1794614400"))
     date = format_datetime(datetime.fromtimestamp(epoch, timezone.utc))
     output.mkdir(parents=True, exist_ok=True)

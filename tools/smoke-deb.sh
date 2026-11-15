@@ -22,7 +22,9 @@ printf '%s\n' "$krect_listing"
 cmp src/main.js /usr/share/kwin/scripts/krect/contents/code/main.js
 desktop-file-validate /usr/share/applications/org.krect.KRect.desktop
 krect --version
-QT_QPA_PLATFORM=offscreen krect --smoke-test
+for krect_language in ko en; do
+    QT_QPA_PLATFORM=offscreen krect --smoke-test --language "$krect_language"
+done
 dpkg --remove krect
 test ! -e /usr/share/kwin/scripts/krect/metadata.json
 test ! -e /usr/bin/krect

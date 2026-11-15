@@ -13,12 +13,26 @@ spec.loader.exec_module(builder)
 
 @unittest.skipUnless(shutil.which("dpkg-deb"), "dpkg-deb required")
 class DebianTests(unittest.TestCase):
+    def test_release_candidates_upgrade_to_the_final_release(self):
+        for ubuntu in ("24.04", "26.04"):
+            rc = builder.debian_version("0.4.0-rc.1", ubuntu)
+            self.assertEqual(rc, f"0.4.0~rc.1-1ubuntu{ubuntu}")
+            for lower, higher in [(builder.debian_version("0.3.1", ubuntu), rc),
+                                  (rc, builder.debian_version("0.4.0-rc.2", ubuntu)),
+                                  (rc, builder.debian_version("0.4.0", ubuntu))]:
+                subprocess.run(["dpkg", "--compare-versions", lower, "lt", higher], check=True)
+        for invalid in ("0.4", "0.4.0-rc.0", "0.4.0-rc.x", "v0.4.0", "0.4.0;bad"):
+            with self.assertRaises(ValueError):
+                builder.debian_version(invalid, "24.04")
+
     def test_packages_have_matching_dependencies_and_global_payload(self):
         with tempfile.TemporaryDirectory(prefix="krect deb tests ") as temporary:
             for ubuntu, major in [("24.04", 5), ("26.04", 6)]:
                 with self.subTest(ubuntu=ubuntu):
                     deb = builder.build(ubuntu, Path(temporary))
                     info = subprocess.check_output(["dpkg-deb", "-f", str(deb)], text=True)
+                    version = builder.json.loads((ROOT / "package/metadata.json").read_text())["KPlugin"]["Version"]
+                    self.assertIn(f"Version: {builder.debian_version(version, ubuntu)}\n", info)
                     self.assertIn("Architecture: all", info)
                     self.assertIn(f"kpackagetool{major}", info)
                     self.assertIn(f"python3-pyqt{major}", info)
