@@ -29,8 +29,8 @@ def smoke(app, icon):
     window = Window(backend, icon)
     window.show()
     app.processEvents()
-    assert len(window.buttons) == 18
-    assert len(window.key_editors) == 18
+    assert len(window.buttons) == 20
+    assert len(window.key_editors) == 20
     assert all(not b.isEnabled() for b in window.buttons.values())
     assert not icon.pixmap(32, 32).isNull(), "Application icon could not be rendered"
     for index in range(window.tabs.count()):

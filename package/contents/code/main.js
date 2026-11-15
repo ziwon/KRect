@@ -39,6 +39,8 @@
         ["center", "Center window", "Ctrl+Alt+C"],
         ["maximize", "Maximize window", "Ctrl+Alt+Return"],
         ["restore", "Restore original placement", "Ctrl+Alt+Backspace"],
+        ["swap", "Swap with another window", ""],
+        ["undo-swap", "Undo window swap", ""],
         ["previous-screen", "Previous screen", "Ctrl+Alt+Shift+Left"],
         ["next-screen", "Next screen", "Ctrl+Alt+Shift+Right"]
     ];
@@ -158,6 +160,7 @@
         var assist = null, assistWindow = null, assistSerial = 0;
         var pairPlacement = null;
         var assistTimer = snapTimer ? env.createTimer() : null;
+        var swapPlacement = null, swapUndo = null;
 
         function ownWindow(w) {
             return w && [w.resourceClass, w.resourceName, w.desktopFileName].some(function (value) {
@@ -182,11 +185,12 @@
             if (!env.callDBus) { return; }
             var w = appTarget();
             var output = w ? screenFor(w) : null;
-            var status = { protocol: 1, version: "0.4.0-rc.1", snapBar: 1, snapAssist: 1, target: w ? {
+            var status = { protocol: 1, version: "0.4.0-rc.1", snapBar: 1, snapAssist: 1, windowSwap: 1, target: w ? {
                 id: id(w), caption: String(w.caption || w.resourceClass || "Window"),
                 application: String(w.desktopFileName || w.resourceClass || ""),
                 geometry: rect(w.frameGeometry), area: areaFor(output, w), screen: name(output),
                 canRestore: Boolean(states[id(w)]), maximizable: Boolean(w.maximizable),
+                canSwap: Boolean(assistTimer && swapEligible(w, settings())), canUndoSwap: canUndoSwap(w),
                 movableAcrossScreens: Boolean(w.moveableAcrossScreens)
             } : null, screens: screenList().map(function (screen) {
                 return { name: name(screen), geometry: rect(screen.geometry), area: areaFor(screen, w) };
@@ -195,10 +199,13 @@
         }
 
         function activated(w) {
+            if (swapPlacement && w && !ownWindow(w) && !swapPlacement.entries.some(function (e) { return e.window === w; })) {
+                cancelSwap(true);
+            }
             if (pairPlacement && w && w !== pairPlacement.window && w !== pairPlacement.source && w !== assistWindow) {
                 cancelPair(true);
             }
-            if (assist && w && w !== assist.source && w !== assistWindow) { cancelAssist(false); }
+            if (assist && w && w !== assist.source && w !== assistWindow && !(assist.action === "swap" && ownWindow(w))) { cancelAssist(false); }
             if (ownWindow(w)) { publish(); return; }
             if (w && (w.normalWindow || w.dialog)) { lastWindow = eligible(w, settings()) ? w : null; }
             publish();
@@ -217,8 +224,9 @@
                     }
                     var w = appTarget();
                     var known = ACTIONS.some(function (a) { return a[0] === command.action; });
-                    var success = Boolean(known && w && id(w) === command.target && safeExecute(command.action, w));
-                    publish({ token: command.token, success: success });
+                    var success = known && w && id(w) === command.target ? safeExecute(command.action, w, command.token) : false;
+                    if (success !== null) { publish({ token: command.token, success: success, operation: command.action === "swap" ? "choose-swap" : command.action,
+                        quiet: success && command.action === "swap" }); }
                 } catch (error) { log("Desktop app command failed: " + String(error)); publish(); }
             });
         }
@@ -322,7 +330,9 @@
         function assistCandidates(s, opts) {
             return Array.prototype.slice.call(plasma5 ? ws.clientList() : (ws.stackingOrder || [])).reverse().filter(function (w) {
                 return w !== s.source && w.normalWindow && !w.dialog && tracked[id(w)] &&
-                    currentContext(w) && eligible(w, opts) && name(screenFor(w)) === s.output && fitsAssist(w, s.target);
+                    currentContext(w) && eligible(w, opts) && name(screenFor(w)) === s.output && fitsAssist(w, s.target) &&
+                    (s.action !== "swap" || (swapEligible(w, opts) && fitsAssist(s.source, w.frameGeometry) &&
+                        near(fit(w.frameGeometry, s.area), w.frameGeometry, 1) && !near(w.frameGeometry, s.placed, 2)));
             });
         }
 
@@ -378,19 +388,22 @@
             var s = assist, opts = settings(), output = findScreen(s.output);
             var area = output && areaFor(output, s.source);
             var active = plasma5 ? ws.activeClient : ws.activeWindow;
-            if (!opts.snapBar || !opts.snapAssist || !tracked[id(s.source)] || !currentContext(s.source) ||
+            var swapping = s.action === "swap";
+            if ((!swapping && (!opts.snapBar || !opts.snapAssist)) || (swapping && !swapEligible(s.source, opts)) ||
+                    !tracked[id(s.source)] || !currentContext(s.source) ||
                     !eligible(s.source, opts) || !area || !near(area, s.area, 0) ||
-                    (active && active !== s.source && active !== assistWindow)) {
+                    (active && active !== s.source && active !== assistWindow && !(swapping && ownWindow(active)))) {
                 cancelAssist(false); return;
             }
             if (s.closedAt !== undefined && now() - s.closedAt > 1000) { cancelAssist(true); return; }
+            if (swapping && !s.focused && now() - s.created > 2500) { cancelAssist(true); return; }
             // Wait for the real frame (Wayland configure/ack and client size hints).
             if (name(screenFor(s.source)) !== s.output || !near(s.source.frameGeometry, s.placed, 2)) {
                 if (s.ready || now() - s.created >= 1000) { cancelAssist(true); }
                 return;
             }
             var candidates = assistCandidates(s, opts);
-            if (!candidates.length || candidates.some(function (w) { return near(w.frameGeometry, s.target, 2); })) {
+            if (!candidates.length || (!swapping && candidates.some(function (w) { return near(w.frameGeometry, s.target, 2); }))) {
                 cancelAssist(true); return;
             }
             s.ready = true;
@@ -429,6 +442,7 @@
             var output = findScreen(s.output), area = areaFor(output, w);
             if (!area || !near(area, s.area, 0)) { cancelAssist(true); return false; }
             cancelAssist(false);
+            if (s.action === "swap") { return startSwap(s.source, w, output, area, command.token); }
             var before = rect(w.frameGeometry), mode = maxMode(w);
             var state = states[id(w)] || { original: { geometry: before, area: rect(area), output: name(output), mode: mode }, last: null };
             pairPlacement = { window: w, source: s.source, placed: s.placed, target: s.target, before: before,
@@ -436,6 +450,101 @@
             assistTimer.start();
             place(w, s.target, output);
             checkPair();
+            return null;
+        }
+
+        function swapEligible(w, opts) {
+            return eligible(w, opts) && w.normalWindow && !w.dialog && currentContext(w) && tracked[id(w)] &&
+                !maxMode(w) && !w.maximizedHorizontally && !w.maximizedVertically && !w.tile;
+        }
+
+        function offerSwap(w, output, area) {
+            if (!assistTimer || !swapEligible(w, settings()) || area.width < 360 || area.height < 320 ||
+                    !near(fit(w.frameGeometry, area), w.frameGeometry, 1)) { return false; }
+            var width = Math.min(480, area.width - 32), height = Math.min(400, area.height - 32);
+            assist = { source: w, session: String(now()) + ":" + (++assistSerial), created: now(),
+                placed: rect(w.frameGeometry), output: name(output), area: rect(area), action: "swap",
+                target: rect(w.frameGeometry), ready: false, focused: false, candidates: [],
+                popup: { x: Math.round(area.x + (area.width - width) / 2),
+                    y: Math.round(area.y + (area.height - height) / 2), width: width, height: height } };
+            assistTimer.start(); updateAssist();
+            return Boolean(assist);
+        }
+
+        function canUndoSwap(w) {
+            var u = swapUndo, opts = settings();
+            if (!u || swapPlacement || !u.entries.some(function (e) { return e.window === w; })) { return false; }
+            var output = findScreen(u.output), area = output && areaFor(output, w);
+            return Boolean(area && near(area, u.area, 0) && u.entries.every(function (e) {
+                return swapEligible(e.window, opts) && name(screenFor(e.window)) === u.output &&
+                    near(e.window.frameGeometry, e.after, 2) && fitsAssist(e.window, e.before);
+            }));
+        }
+
+        function cancelSwap(rollback, removed) {
+            var p = swapPlacement;
+            if (!p) { return; }
+            swapPlacement = null; assistTimer.stop();
+            var output = findScreen(p.output), area = output && areaFor(output, p.entries[0].window);
+            if (rollback && area && near(area, p.area, 0)) {
+                p.entries.forEach(function (e) {
+                    if (e.window !== removed && swapEligible(e.window, settings())) {
+                        try { place(e.window, e.before, output); }
+                        catch (error) { log("Swap rollback failed: " + String(error)); }
+                    }
+                });
+            }
+            publish({ token: p.token, success: false });
+        }
+
+        function checkSwap() {
+            var p = swapPlacement;
+            if (!p) { return; }
+            var output = findScreen(p.output), area = output && areaFor(output, p.entries[0].window), opts = settings();
+            var active = plasma5 ? ws.activeClient : ws.activeWindow;
+            if (!area || !near(area, p.area, 0) ||
+                    (active && !ownWindow(active) && !p.entries.some(function (e) { return e.window === active; })) ||
+                    !p.entries.every(function (e) {
+                        return swapEligible(e.window, opts) && name(screenFor(e.window)) === p.output && fitsAssist(e.window, e.target);
+                    })) { cancelSwap(true); return; }
+            if (!p.entries.every(function (e) { return near(e.window.frameGeometry, e.target, 2); })) {
+                if (now() - p.created >= 1000) { cancelSwap(true); }
+                return;
+            }
+            swapPlacement = null; assistTimer.stop();
+            p.entries.forEach(function (e, i) {
+                if (p.undo) {
+                    var previous = p.undo.entries[i].previous;
+                    if (previous) { states[id(e.window)] = previous; } else { delete states[id(e.window)]; }
+                } else {
+                    var state = states[id(e.window)] || { original: { geometry: e.before, area: rect(area), output: p.output, mode: 0 }, last: null };
+                    states[id(e.window)] = state;
+                    remember(state, "swap", 0, e.target, e.before, output, area);
+                }
+            });
+            swapUndo = p.undo ? null : { output: p.output, area: p.area, entries: p.entries.map(function (e) {
+                return { window: e.window, before: e.before, after: e.target, previous: e.previous };
+            }) };
+            lastWindow = p.focus;
+            if (plasma5) { ws.activeClient = p.focus; } else { ws.activeWindow = p.focus; }
+            publish({ token: p.token, success: true, operation: p.undo ? "undo-swap" : "swap" });
+        }
+
+        function startSwap(first, second, output, area, token, undo) {
+            var windows = [first, second];
+            var entries = windows.map(function (w, i) {
+                return { window: w, before: rect(w.frameGeometry),
+                    target: undo ? rect(undo.entries[i].before) : rect(windows[1 - i].frameGeometry),
+                    previous: states[id(w)] ? JSON.parse(JSON.stringify(states[id(w)])) : null };
+            });
+            if (!entries.every(function (e) { return swapEligible(e.window, settings()) && fitsAssist(e.window, e.target); })) { return false; }
+            swapPlacement = { entries: entries, output: name(output), area: rect(area), token: token,
+                created: now(), undo: undo || null, focus: undo ? appTarget() || first : first };
+            assistTimer.start();
+            try {
+                entries.forEach(function (e) { place(e.window, e.target, output); });
+                checkSwap();
+            } catch (error) { log("Swap failed: " + String(error)); cancelSwap(true); }
             return null;
         }
 
@@ -519,6 +628,8 @@
 
         function beginDrag(w) {
             cancelPair(false);
+            cancelSwap(true);
+            if (swapUndo && swapUndo.entries.some(function (e) { return e.window === w; })) { swapUndo = null; }
             cancelAssist(false);
             cancelDrag();
             var opts = settings(), area = areaFor(screenFor(w), w);
@@ -575,8 +686,8 @@
             });
             assistTimer.interval = 200;
             assistTimer.timeout.connect(function () {
-                try { checkPair(); updateAssist(); }
-                catch (error) { log("Snap assist failed: " + String(error)); cancelPair(true); cancelAssist(true); }
+                try { checkPair(); checkSwap(); updateAssist(); }
+                catch (error) { log("Window chooser failed: " + String(error)); cancelPair(true); cancelSwap(true); cancelAssist(true); }
             });
         }
 
@@ -649,7 +760,7 @@
             if (output && name(output) !== name(screenFor(w))) {
                 ws.sendClientToScreen(w, plasma5 ? output.index : output);
             }
-            w.frameGeometry = geometry;
+            w.frameGeometry = rect(geometry);
         }
 
         function remember(state, action, index, geometry, before, output, area) {
@@ -662,7 +773,7 @@
                 (now() - last.time < 250 && near(w.frameGeometry, last.before, 2)));
         }
 
-        function execute(action, explicitWindow) {
+        function execute(action, explicitWindow, token) {
             var opts = settings();
             var w = explicitWindow || (plasma5 ? ws.activeClient : ws.activeWindow);
             if (!eligible(w, opts)) { return false; }
@@ -671,6 +782,13 @@
             var area = areaFor(output, w);
             if (!area) { return false; }
             var key = id(w), state = states[key], target, before, last, dest;
+
+            if (action === "swap") { return offerSwap(w, output, area); }
+            if (action === "undo-swap") {
+                if (!canUndoSwap(w)) { return false; }
+                return startSwap(swapUndo.entries[0].window, swapUndo.entries[1].window, output, area, token, swapUndo);
+            }
+            if (swapUndo && swapUndo.entries.some(function (e) { return e.window === w; })) { swapUndo = null; }
 
             if (action === "restore") {
                 if (!state) { return false; }
@@ -752,10 +870,11 @@
             return true;
         }
 
-        function safeExecute(action, w) {
+        function safeExecute(action, w, token) {
             cancelPair(true);
+            cancelSwap(true);
             cancelAssist(true);
-            try { var result = execute(action, w); publish(); return result; }
+            try { var result = execute(action, w, token); publish(); return result; }
             catch (error) { log(action + " failed: " + String(error)); return false; }
         }
 
@@ -763,6 +882,8 @@
         var added = ws.windowAdded || ws.clientAdded;
         if (removed) {
             removed.connect(function (w) {
+                if (swapPlacement && swapPlacement.entries.some(function (e) { return e.window === w; })) { cancelSwap(true, w); }
+                if (swapUndo && swapUndo.entries.some(function (e) { return e.window === w; })) { swapUndo = null; }
                 if (pairPlacement && (pairPlacement.window === w || pairPlacement.source === w)) { cancelPair(pairPlacement.source === w); }
                 if ((drag && drag.window === w) || (pendingDrop && pendingDrop.drag.window === w)) { cancelDrag(); }
                 if (overlay === w) { overlay = null; if (drag) { hideSnap(); } }
@@ -784,7 +905,7 @@
         var activation = ws.windowActivated || ws.clientActivated;
         if (activation) { activation.connect(activated); }
         [ws.currentDesktopChanged, ws.currentActivityChanged, ws.screensChanged, ws.numberScreensChanged].forEach(function (signal) {
-            if (signal && env.callDBus) { signal.connect(function () { cancelDrag(); cancelPair(true); cancelAssist(false); publish(); }); }
+            if (signal && env.callDBus) { signal.connect(function () { cancelDrag(); cancelPair(true); cancelSwap(true); swapUndo = null; cancelAssist(false); publish(); }); }
         });
         if (ws.cursorPosChanged && snapTimer) { ws.cursorPosChanged.connect(updateDrag); }
         activated(plasma5 ? ws.activeClient : ws.activeWindow);

@@ -44,9 +44,9 @@ class SnapAssist(W.QFrame):
         font.setBold(True)
         self.heading.setFont(font)
         box.addWidget(self.heading)
-        hint = W.QLabel(tr("Open windows on this display. Enter to place.", "같은 모니터의 열린 창이에요. Enter로 배치하세요."))
-        hint.setWordWrap(True)
-        box.addWidget(hint)
+        self.hint = W.QLabel()
+        self.hint.setWordWrap(True)
+        box.addWidget(self.hint)
         self.windows = W.QListWidget()
         self.windows.setAccessibleName(tr("Available windows", "배치할 수 있는 창"))
         self.windows.setIconSize(C.QSize(32, 32))
@@ -74,8 +74,14 @@ class SnapAssist(W.QFrame):
         titles = {"left": tr("Choose a window for the left half", "왼쪽에 놓을 창을 선택하세요"),
                   "right": tr("Choose a window for the right half", "오른쪽에 놓을 창을 선택하세요"),
                   "top": tr("Choose a window for the top half", "위쪽에 놓을 창을 선택하세요"),
-                  "bottom": tr("Choose a window for the bottom half", "아래쪽에 놓을 창을 선택하세요")}
+                  "bottom": tr("Choose a window for the bottom half", "아래쪽에 놓을 창을 선택하세요"),
+                  "swap": tr("Choose a window to swap with", "서로 자리를 바꿀 창을 선택하세요")}
         self.heading.setText(titles[model["action"]])
+        self.setAccessibleName(titles[model["action"]])
+        swapping = model["action"] == "swap"
+        self.hint.setText(tr("Both windows exchange position and size. Enter to swap.", "두 창의 위치와 크기를 서로 바꿔요. Enter로 교환하세요.") if swapping else
+                          tr("Open windows on this display. Enter to place.", "같은 모니터의 열린 창이에요. Enter로 배치하세요."))
+        self.skip_button.setText(tr("Cancel (Esc)", "취소 (Esc)") if swapping else tr("Skip (Esc)", "건너뛰기 (Esc)"))
         if fresh or self.entries != model["candidates"]:
             current = self.windows.currentItem()
             selected = current.data(C.Qt.ItemDataRole.UserRole) if current and not fresh else None

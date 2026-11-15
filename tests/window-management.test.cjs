@@ -98,10 +98,12 @@ test('all layout targets stay positive and inside small, scaled and negative are
     }
 });
 
-test('18 unique shortcuts are registered', () => {
+test('18 default shortcuts stay unique and swap actions start unassigned', () => {
     const h = harness();
-    assert.equal(h.shortcuts.size, 18);
-    assert.equal(new Set([...h.shortcuts.values()].map(s => s.key)).size, 18);
+    assert.equal(h.shortcuts.size, 20);
+    assert.equal(new Set([...h.shortcuts.values()].map(s => s.key).filter(Boolean)).size, 18);
+    assert.equal(h.shortcuts.get('KRect-swap').key, '');
+    assert.equal(h.shortcuts.get('KRect-undo-swap').key, '');
     h.shortcuts.get('KRect-left').callback();
     assert.deepEqual(h.w.frameGeometry, { x: 8, y: 48, width: 948, height: 1024 });
 });
@@ -288,5 +290,5 @@ test('KWin entry point registers shortcuts without CommonJS or browser globals',
         registerShortcut: (...args) => { registrations.push(args); return true; },
         registerUserActionsMenu: () => {}, console: { log() {} }
     });
-    assert.equal(registrations.length, 18);
+    assert.equal(registrations.length, 20);
 });

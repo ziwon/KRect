@@ -97,6 +97,121 @@ function desktop({ plasma5 = false, config = {}, app = true, overlayCaption = 'K
         assists, addWindow, choose, tick, statuses, chooser: () => chooser };
 }
 
+const swapFrame = { x: -900, y: 420, width: 800, height: 600 };
+
+for (const plasma5 of [false, true]) {
+    test(`Plasma ${plasma5 ? 5 : 6}: swaps both frames and undoes the pair, retaining earlier restore history`, () => {
+        const h = desktop({ plasma5 }), other = h.addWindow('other', { frameGeometry: { ...swapFrame } });
+        h.controller.execute('left', h.work);
+        const left = { ...h.work.frameGeometry };
+        assert.equal(h.controller.execute('swap', h.work), true);
+        assert.equal(h.assists.at(-1).action, 'swap');
+        assert.deepEqual(h.assists.at(-1).candidates.map(c => c.id), ['other']);
+        h.choose('other');
+        assert.deepEqual(h.work.frameGeometry, swapFrame);
+        assert.deepEqual(other.frameGeometry, left);
+        assert.equal(h.statuses.at(-1).result.success, true);
+        assert.equal(h.statuses.at(-1).target.canUndoSwap, true);
+        h.controller.execute('undo-swap', h.work);
+        assert.deepEqual(h.work.frameGeometry, left);
+        assert.deepEqual(other.frameGeometry, swapFrame);
+        assert.equal(h.statuses.at(-1).target.canUndoSwap, false);
+        assert.equal(h.controller.execute('restore', other), false);
+        assert.equal(h.controller.execute('restore', h.work), true);
+        assert.deepEqual(h.work.frameGeometry, h.initial);
+    });
+}
+
+test('swap cancellation and stale selections leave both windows untouched', () => {
+    const h = desktop(), other = h.addWindow('other', { frameGeometry: { ...swapFrame } });
+    h.controller.execute('swap', h.work);
+    const session = h.assists.at(-1).session;
+    h.choose(''); h.choose('other', session);
+    assert.deepEqual(h.work.frameGeometry, h.initial);
+    assert.deepEqual(other.frameGeometry, swapFrame);
+    assert.equal(h.statuses.at(-1).result.success, false);
+    assert.equal(h.controller.execute('restore', h.work), false);
+});
+
+test('swap candidates must fit in both directions and share the monitor and context', () => {
+    const h = desktop({ config: { SnapBar: false, SnapAssist: false } });
+    h.work.minSize = { width: 600, height: 300 };
+    h.addWindow('valid', { frameGeometry: { ...swapFrame } });
+    h.addWindow('too-small-for-source', { frameGeometry: { ...swapFrame, width: 500 } });
+    h.addWindow('too-big-for-source-frame', { frameGeometry: { ...swapFrame }, minSize: { width: 700 } });
+    h.addWindow('maximized', { frameGeometry: { ...swapFrame }, maximizeMode: 3 });
+    h.addWindow('dialog', { frameGeometry: { ...swapFrame }, dialog: true });
+    h.addWindow('different-monitor', { frameGeometry: { ...swapFrame }, output: h.screens[1] });
+    h.addWindow('different-desktop', { frameGeometry: { ...swapFrame }, desktops: [2] });
+    assert.equal(h.controller.execute('swap', h.work), true, 'manual swap does not depend on snap preferences');
+    assert.deepEqual(h.assists.at(-1).candidates.map(c => c.id), ['valid']);
+});
+
+test('swap waits for both actual frames before succeeding and enabling undo', () => {
+    const h = desktop(), other = h.addWindow('other', { frameGeometry: { ...swapFrame } });
+    let actual = { ...swapFrame }, requested;
+    Object.defineProperty(other, 'frameGeometry', { get: () => actual, set: g => { requested = { ...g }; } });
+    h.controller.execute('swap', h.work); h.choose('other'); h.tick();
+    assert.equal(h.statuses.some(s => s.result?.token === 'choice'), false);
+    actual = requested; h.tick();
+    assert.equal(h.statuses.at(-1).result.success, true);
+    assert.equal(h.statuses.at(-1).target.canUndoSwap, true);
+});
+
+test('a refused second frame rolls back the first and does not create restore history', () => {
+    const h = desktop(), other = h.addWindow('other', { frameGeometry: { ...swapFrame } });
+    Object.defineProperty(other, 'frameGeometry', { get: () => ({ ...swapFrame }), set() {} });
+    h.controller.execute('swap', h.work); h.choose('other');
+    assert.deepEqual(h.work.frameGeometry, swapFrame);
+    h.tick(1000);
+    assert.deepEqual(h.work.frameGeometry, h.initial);
+    assert.equal(h.statuses.at(-1).result.success, false);
+    assert.equal(h.controller.execute('restore', h.work), false);
+    assert.equal(h.controller.execute('undo-swap', h.work), false);
+});
+
+test('switching tasks during swap rolls back without stealing focus', () => {
+    const h = desktop(), other = h.addWindow('other', { frameGeometry: { ...swapFrame } });
+    const task = h.addWindow('task', { frameGeometry: { ...swapFrame, x: -1800 } });
+    Object.defineProperty(other, 'frameGeometry', { get: () => ({ ...swapFrame }), set() {} });
+    h.controller.execute('swap', h.work); h.choose('other');
+    h.ws.activeWindow = task; h.ws.windowActivated.emit(task);
+    assert.deepEqual(h.work.frameGeometry, h.initial);
+    assert.equal(h.ws.activeWindow, task);
+    assert.equal(h.statuses.findLast(s => s.result)?.result.success, false);
+});
+
+test('a closed candidate cannot be selected and stale undo cannot move a changed pair', () => {
+    const h = desktop(), other = h.addWindow('other', { frameGeometry: { ...swapFrame } });
+    h.controller.execute('swap', h.work); h.choose('other');
+    other.frameGeometry.x += 40;
+    assert.equal(h.controller.execute('undo-swap', h.work), false);
+    assert.deepEqual(h.work.frameGeometry, swapFrame);
+    h.controller.execute('swap', h.work);
+    h.ws.windowRemoved.emit(other);
+    h.choose('other');
+    assert.equal(h.statuses.at(-1).result.success, false);
+    assert.deepEqual(h.work.frameGeometry, swapFrame);
+});
+
+test('closing a candidate during delayed swap rolls back the surviving window', () => {
+    const h = desktop(), other = h.addWindow('other', { frameGeometry: { ...swapFrame } });
+    Object.defineProperty(other, 'frameGeometry', { get: () => ({ ...swapFrame }), set() {} });
+    h.controller.execute('swap', h.work); h.choose('other');
+    h.ws.windowRemoved.emit(other);
+    assert.deepEqual(h.work.frameGeometry, h.initial);
+    assert.equal(h.statuses.findLast(s => s.result).result.success, false);
+    assert.equal(h.controller.execute('restore', h.work), false);
+});
+
+test('without the desktop chooser a swap request expires without moving windows', () => {
+    const h = desktop({ app: false }), other = h.addWindow('other', { frameGeometry: { ...swapFrame } });
+    h.controller.execute('swap', h.work); h.tick(2600);
+    assert.equal(h.assists.at(-1).visible, false);
+    assert.deepEqual(h.work.frameGeometry, h.initial);
+    assert.deepEqual(other.frameGeometry, swapFrame);
+});
+
 for (const plasma5 of [false, true]) {
     test(`Plasma ${plasma5 ? 5 : 6}: top drag shows layouts, previews a region, drops once, and restores`, () => {
         const h = desktop({ plasma5 }); h.begin(); h.hover('left');

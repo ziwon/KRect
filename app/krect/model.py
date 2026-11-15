@@ -19,6 +19,7 @@ ACTIONS = [
     ("center", "Center", "가운데로"), ("maximize", "Maximize", "최대화"),
     ("restore", "Restore", "원래 배치로"),
     ("previous-screen", "Previous display", "이전 화면"), ("next-screen", "Next display", "다음 화면"),
+    ("swap", "Swap windows…", "두 창 교환…"), ("undo-swap", "Undo swap", "교환 되돌리기"),
 ]
 LABELS = {key: tr(en, ko) for key, en, ko in ACTIONS}
 

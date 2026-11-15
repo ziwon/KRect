@@ -33,6 +33,13 @@ def draw_layout(painter, bounds, action, palette, portrait=False):
         painter.setBrush(palette.color(G.QPalette.ColorRole.Highlight))
         painter.drawRect(C.QRectF(inner.x() + inner.width()*f[0], inner.y() + inner.height()*f[1],
                                  inner.width()*f[2], inner.height()*f[3]))
+    elif action == "swap":
+        center = bounds.center()
+        for sign in (-1, 1):
+            y = center.y() - sign * 5
+            painter.drawLine(C.QPointF(center.x()-9*sign, y), C.QPointF(center.x()+9*sign, y))
+            painter.drawLine(C.QPointF(center.x()+9*sign, y), C.QPointF(center.x()+4*sign, y-4))
+            painter.drawLine(C.QPointF(center.x()+9*sign, y), C.QPointF(center.x()+4*sign, y+4))
     else:
         center = bounds.center()
         sign = 1 if action == "next-screen" else -1
@@ -42,6 +49,10 @@ def draw_layout(painter, bounds, action, palette, portrait=False):
 
 
 def layout_icon(action, palette, portrait=False):
+    if action == "undo-swap":
+        themed = G.QIcon.fromTheme("edit-undo")
+        if not themed.isNull():
+            return themed
     pixmap = G.QPixmap(80, 64)
     pixmap.fill(C.Qt.GlobalColor.transparent)
     pixmap.setDevicePixelRatio(2)
@@ -226,13 +237,13 @@ class Window(W.QMainWindow):
             self.buttons[action] = button
             grid.addWidget(button, i//4, i%4)
         box.addLayout(grid)
-        monitors = W.QHBoxLayout()
-        for action, _, _ in ACTIONS[16:]:
+        utilities = W.QGridLayout()
+        for i, (action, _, _) in enumerate(ACTIONS[16:]):
             button = W.QPushButton(LABELS[action])
             button.clicked.connect(lambda checked=False, a=action: self.backend.apply(a))
             self.buttons[action] = button
-            monitors.addWidget(button)
-        box.addLayout(monitors)
+            utilities.addWidget(button, i // 2, i % 2)
+        box.addLayout(utilities)
         box.addWidget(text_label(tr("Select a work window, then choose a layout here or from the tray. Repeat a half shortcut to cycle ½ → ⅔ → ⅓.",
                                     "작업할 창을 선택한 다음 여기나 트레이에서 배치하세요. 절반 단축키를 연속으로 누르면 ½ → ⅔ → ⅓로 바뀌어요."), True))
         scroll = W.QScrollArea()
@@ -428,6 +439,10 @@ class Window(W.QMainWindow):
                 enabled = enabled and target.get("canRestore", False)
             elif action == "maximize":
                 enabled = enabled and target.get("maximizable", False)
+            elif action == "swap":
+                enabled = enabled and target.get("canSwap", False)
+            elif action == "undo-swap":
+                enabled = enabled and target.get("canUndoSwap", False)
             elif action.endswith("-screen"):
                 enabled = enabled and len(screens) > 1 and target.get("movableAcrossScreens", False)
             button.setEnabled(bool(enabled))

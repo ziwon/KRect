@@ -54,9 +54,13 @@ class Bridge(DesktopBridge):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--assist", action="store_true", help="Check the second-window chooser with disposable windows")
+    parser.add_argument("--swap", action="store_true", help="Check swapping and undo with two disposable windows")
     options = parser.parse_args()
     if os.environ.get("XDG_SESSION_TYPE") != "x11":
         raise SystemExit("This live input harness is for KDE/X11 only.")
+    if dbus.SessionBus().call_blocking("org.freedesktop.ScreenSaver", "/ScreenSaver",
+                                       "org.freedesktop.ScreenSaver", "GetActive", "", []):
+        raise SystemExit("KDE is locked. Unlock the desktop before running live input checks; no input was sent.")
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     app = W.QApplication(["krect"])
     app.setApplicationDisplayName("KRect")
@@ -114,6 +118,7 @@ poll.timeout.connect(function () {
                 if (c.action === "setup") { w.setMaximize(false, false); w.frameGeometry = c.geometry; workspace.activeClient = w; }
                 if (c.action === "restore") { result.restored = controller.execute("restore", w); }
                 if (c.action === "maximize") { controller.execute("maximize", w); }
+                if (c.action === "swap" || c.action === "undo-swap") { result.accepted = controller.execute(c.action, w); }
                 if (c.action === "keep-above") { w.keepAbove = Boolean(c.enabled); }
                 result.keepAbove = w.keepAbove;
                 result.geometry = geometry(w); result.move = w.move; result.windowId = Number(w.windowId);
@@ -251,15 +256,62 @@ if len(__import__("sys").argv) > 1:
     other=W.QLabel("Second disposable window — safe to arrange")
     other.setWindowTitle("KRect Assist Validation Candidate");other.resize(600,400);other.show()
 C.QTimer.singleShot(180000,app.quit);app.exec_()
-''', *( ["assist"] if options.assist else [])], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+''', *( ["pair"] if options.assist or options.swap else [])], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         wait(.8)
         screens = command()["screens"]
         landscape_index = next((i for i, a in enumerate(screens) if a["width"] > a["height"]), None)
         portrait_index = next((i for i, a in enumerate(screens) if a["height"] > a["width"]), None)
-        assert landscape_index is not None and portrait_index is not None, "This check needs a landscape and portrait display"
+        assert landscape_index is not None and (options.swap or portrait_index is not None), "This check needs the requested display orientations"
         area = screens[landscape_index]
         initial = dict(x=area["x"]+round(area["width"]/3), y=area["y"]+round(area["height"]/3),
                        width=min(900, area["width"]//2), height=min(600, area["height"]//2))
+        if options.swap:
+            other_initial = dict(initial, x=initial["x"]+150, y=initial["y"]+120, width=700, height=450)
+
+            def show_swap():
+                command("setup", other=True, geometry=other_initial)
+                command("setup", geometry=initial)
+                wait(.4)
+                assert command("swap")["accepted"]
+                wait(.4)
+                state = command()
+                assert chooser.isVisible() and state["choosers"][0]["active"], (state, bridge.logs)
+                model = bridge.assists[-1]
+                assert model["action"] == "swap" and len(model["candidates"]) == 1, model
+                assert state["choosers"][0]["geometry"] == model["geometry"], state
+                return model
+
+            show_swap()
+            app.primaryScreen().grabWindow(int(chooser.winId())).save(str(EVIDENCE / "swap-native.png"))
+            key(0xff0d); wait(.5)
+            assert command()["geometry"] == other_initial and command()["active"], {
+                "state": command(), "focus": str(app.focusWidget()), "active": str(app.activeWindow()),
+                "pending": bridge.command, "status": bridge.statuses[-3:], "logs": bridge.logs}
+            assert command(other=True)["geometry"] == initial, command(other=True)
+            assert not chooser.isVisible()
+            command("undo-swap"); wait(.4)
+            assert command()["geometry"] == initial and command(other=True)["geometry"] == other_initial
+            checks.append("Enter exchanges both frames, focuses the source and undo restores the pair")
+
+            show_swap(); escape(); wait(.4)
+            assert not chooser.isVisible() and command()["active"]
+            assert command()["geometry"] == initial and command(other=True)["geometry"] == other_initial
+            checks.append("Esc cancels swap without moving either window")
+
+            model = show_swap()
+            item = chooser.windows.visualItemRect(chooser.windows.item(0)).center()
+            local = chooser.windows.viewport().mapTo(chooser, item)
+            g = model["geometry"]
+            move(g["x"] + local.x() * g["width"] / chooser.width(), g["y"] + local.y() * g["height"] / chooser.height())
+            button(True); button(False); wait(.5)
+            assert command()["geometry"] == other_initial and command(other=True)["geometry"] == initial
+            command("restore"); command("restore", other=True); wait(.4)
+            assert command()["geometry"] == initial and command(other=True)["geometry"] == other_initial
+            checks.append("Native click swaps windows and each window retains its original restore")
+            assert not bridge.logs, bridge.logs
+            (EVIDENCE / "swap-results.json").write_text(json.dumps(dict(checks=checks, logs=bridge.logs), indent=2)+"\n")
+            print(json.dumps(dict(passed=len(checks), checks=checks), ensure_ascii=False))
+            return
         if options.assist:
             other_initial = dict(initial, x=initial["x"] + 120, y=initial["y"] + 100, width=700, height=450)
 

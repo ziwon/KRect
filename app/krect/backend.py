@@ -91,7 +91,7 @@ class DesktopBridge(QtCore.QObject):
                     return
                 if not isinstance(model.get("session"), str) or not 0 < len(model["session"]) <= 100:
                     return
-                if model.get("action") not in ("left", "right", "top", "bottom"):
+                if model.get("action") not in ("left", "right", "top", "bottom", "swap"):
                     return
                 candidates = model.get("candidates")
                 if not isinstance(candidates, list) or not 0 < len(candidates) <= 50:
@@ -221,7 +221,7 @@ class Backend(QtCore.QObject):
                 self.start()
 
     def upgrade_connection(self):
-        if self.enabled and (self.status.get("version") != VERSION or self.status.get("snapBar") != 1 or self.status.get("snapAssist") != 1):
+        if self.enabled and (self.status.get("version") != VERSION or self.status.get("snapBar") != 1 or self.status.get("snapAssist") != 1 or self.status.get("windowSwap") != 1):
             try:
                 self.start()
             except Exception as error:
@@ -262,8 +262,12 @@ class Backend(QtCore.QObject):
             self.pending = None
             self.timeout.stop()
             if not result.get("quiet"):
-                self.message.emit(tr("Placement applied.", "배치를 적용했어요.") if result.get("success") else
-                                  tr("Cannot apply to this window. Select a movable window and try again.", "이 창에 적용할 수 없어요. 이동 가능한 창을 선택하고 다시 시도하세요."), not result.get("success", False))
+                success_text = {"swap": tr("Windows swapped.", "두 창을 교환했어요."),
+                                "undo-swap": tr("Window swap undone.", "두 창을 교환 전 위치로 되돌렸어요.")}.get(
+                                    result.get("operation"), tr("Placement applied.", "배치를 적용했어요."))
+                failure_text = tr("No compatible window to swap on this display.", "같은 모니터에 교환할 수 있는 다른 창이 없어요.") if result.get("operation") == "choose-swap" else tr(
+                    "Cannot apply to this window. Select a movable window and try again.", "이 창에 적용할 수 없어요. 이동 가능한 창을 선택하고 다시 시도하세요.")
+                self.message.emit(success_text if result.get("success") else failure_text, not result.get("success", False))
         self.changed.emit(status)
 
     def apply(self, action):

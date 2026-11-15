@@ -1,7 +1,44 @@
 # Validation notes
 
-Date: 2026-11-15. Prerelease: 0.4.0-rc.1 second-window suggestions and About.
+Date: 2026-11-15. Development: window swap (unreleased).
+Published prerelease: 0.4.0-rc.1 second-window suggestions and About.
 Older release sections below retain their historical results and limitations.
+
+## Window swap — unreleased
+
+The app/tray and assignable shortcuts offer a chooser for exchanging the position
+and size of two compatible normal windows on the same monitor, desktop and
+activity. Swap and Undo swap have no default key binding. Undo restores both
+frames and their previous per-window restore histories; changing either window's
+placement or closing it invalidates the pair. Both actual frames must match before
+success is reported. Refusal, timeout, closure or task switching cancels the
+transaction and attempts to roll back surviving eligible windows.
+
+Observed checks:
+
+- **112 automated tests** passed: 83 Node and 29 Python. New cases cover both
+  Plasma API generations, both-direction size constraints, delayed frames,
+  refusal rollback, cancelled/stale choices, task switching, a closed candidate,
+  a missing desktop chooser and preserving earlier restore history through undo.
+- Korean/English UI smoke passed on **Qt 5.15.13** and container **Qt 6.10.2**.
+  Qt 6 also passed seven chooser and three snap-bar tests, including swap wording
+  and Enter selection.
+- The user's installed package is `0.4.0~rc.1-1ubuntu24.04`. A lingering snapfix3
+  tray process was replaced with `/usr/share/krect/main.py`; the live D-Bus engine
+  reported `0.4.0-rc.1`, `snapBar: 1`, `snapAssist: 1`. The installed package and
+  engine are kept at RC1; the unreleased swap code has not been installed.
+- **Native swap validation is pending.** The first disposable-window attempt
+  could not deliver Enter while KDE's screen lock was active (`GetActive=true`).
+  The harness cleaned up its windows/script; production KRect remained running.
+  It now checks the screen lock before sending input. After unlocking, run
+  `/usr/bin/python3 -B tools/validate_snap_x11.py --swap` for native Enter/undo,
+  Esc and click/per-window-restore scenarios. No live swap pass is claimed.
+  The user currently has terminal-only remote access, so live input checks are
+  deferred until desktop access is available. Keep RC1 installed in the meantime.
+
+Live Plasma 6/Wayland remains unverified. Maximized/fullscreen/minimized windows,
+dialogs, fixed sizes, custom tiles and cross-monitor swaps are outside this first
+implementation.
 
 ## Release candidate packaging and Qt 6
 

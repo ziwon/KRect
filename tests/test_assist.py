@@ -99,6 +99,15 @@ class AssistTests(unittest.TestCase):
             self.bridge.AssistUpdate(raw)
             self.assertFalse(self.chooser.isVisible(), raw)
 
+    def test_swap_chooser_changes_instructions_and_enter_selects(self):
+        self.show(dict(self.model, action="swap"))
+        self.assertTrue(self.chooser.isVisible())
+        from krect.model import tr
+        self.assertEqual(self.chooser.heading.text(), tr("Choose a window to swap with", "서로 자리를 바꿀 창을 선택하세요"))
+        self.assertEqual(self.chooser.skip_button.text(), tr("Cancel (Esc)", "취소 (Esc)"))
+        QTest.keyClick(self.chooser.windows, C.Qt.Key.Key_Return)
+        self.assertEqual(self.commands, [("test:1", "editor")])
+
     def test_desktop_entry_icon_can_differ_from_application_id(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
