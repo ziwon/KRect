@@ -144,6 +144,13 @@ jobs:
           cd dist
           notes_file="../docs/releases/${RELEASE_TAG#v}.md"
           test -f "$notes_file" || { echo "Missing bilingual release notes: $notes_file" >&2; exit 1; }
+          # GitHub replaces '~' in asset names; preserve it only inside Debian metadata.
+          for package in *.deb; do
+            release_name=${package//\~/-}
+            if [[ "$package" != "$release_name" ]]; then
+              mv -- "$package" "$release_name"
+            fi
+          done
           sha256sum -- *.deb *.kwinscript *.zip > SHA256SUMS
           release_flags=()
           if [[ "$RELEASE_TAG" == *-rc.* ]]; then

@@ -18,6 +18,22 @@ keeps them out of Latest, and permits the landing page to retain stable 0.3.1.
 Live Plasma 6/Wayland remains pending; an offscreen Qt 6 pass is not compositor
 validation. The tag workflow separately verifies package installation/removal.
 
+The [RC tag workflow](https://github.com/ziwon/KRect/actions/runs/43662134726)
+passed validation and both Ubuntu package jobs. Its publication job failed because
+the container used `sh` for Bash array syntax. The workflow now explicitly selects
+Bash. The already validated artifacts were published through `gh`, without changing
+their contents or moving the tag. GitHub also rewrote `~` in uploaded asset names;
+publication now converts it to `-` before generating checksums. The internal Debian
+version retains `~rc.1`.
+
+The published RC was downloaded again: all four payload checksums, both Debian
+versions/dependencies/app and engine contents, prerelease status, bilingual notes
+and all five download links passed verification. Stable Latest remains 0.3.1.
+The publication step passed local checks for stable creation, RC creation and RC
+republication using its declared shell, including the renamed-file checksums.
+These publication fixes are later commits on `main`; the original tag workflow
+still records its publication failure.
+
 ## Second-window suggestions — 0.4.0-rc.1
 
 The development build offers a native chooser after dragging a window into a
