@@ -18,13 +18,14 @@ SERVICE = "org.krect.KRect"
 DATA = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
 DEFAULTS = {"Gap": 8, "CycleHalves": True, "CycleTimeout": 1200,
-            "PortraitThirds": True, "SnapBar": True, "IgnoredApplications": ""}
+            "PortraitThirds": True, "SnapBar": True, "SnapAssist": True, "IgnoredApplications": ""}
 
 
 class DesktopBridge(QtCore.QObject):
     updated = Signal(dict)
     activated = Signal()
     snap_updated = Signal(dict)
+    assist_updated = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -75,6 +76,37 @@ class DesktopBridge(QtCore.QObject):
     @Slot()
     def Activate(self):
         self.activated.emit()
+
+    @Slot(str)
+    def AssistUpdate(self, raw):
+        try:
+            model = json.loads(raw)
+            if not isinstance(model, dict) or type(model.get("visible")) is not bool:
+                return
+            if model["visible"]:
+                geometry = model.get("geometry", {})
+                if not all(type(geometry.get(k)) in (int, float) and math.isfinite(geometry[k]) for k in ("x", "y", "width", "height")):
+                    return
+                if not (0 < geometry["width"] <= 1000 and 0 < geometry["height"] <= 800):
+                    return
+                if not isinstance(model.get("session"), str) or not 0 < len(model["session"]) <= 100:
+                    return
+                if model.get("action") not in ("left", "right", "top", "bottom"):
+                    return
+                candidates = model.get("candidates")
+                if not isinstance(candidates, list) or not 0 < len(candidates) <= 50:
+                    return
+                ids = set()
+                for candidate in candidates:
+                    for key, limit in (("id", 200), ("caption", 300), ("application", 200)):
+                        if not isinstance(candidate.get(key), str) or len(candidate[key]) > limit:
+                            return
+                    if not candidate["id"] or candidate["id"] in ids:
+                        return
+                    ids.add(candidate["id"])
+            self.assist_updated.emit(model)
+        except (ValueError, TypeError, AttributeError):
+            pass
 
 
 class Backend(QtCore.QObject):
@@ -189,7 +221,7 @@ class Backend(QtCore.QObject):
                 self.start()
 
     def upgrade_connection(self):
-        if self.enabled and (self.status.get("version") != VERSION or self.status.get("snapBar") != 1):
+        if self.enabled and (self.status.get("version") != VERSION or self.status.get("snapBar") != 1 or self.status.get("snapAssist") != 1):
             try:
                 self.start()
             except Exception as error:
@@ -229,16 +261,24 @@ class Backend(QtCore.QObject):
         if self.pending and result.get("token") == self.pending:
             self.pending = None
             self.timeout.stop()
-            self.message.emit(tr("Placement applied.", "배치를 적용했어요.") if result.get("success") else
-                              tr("Cannot apply to this window. Select a movable window and try again.", "이 창에 적용할 수 없어요. 이동 가능한 창을 선택하고 다시 시도하세요."), not result.get("success", False))
+            if not result.get("quiet"):
+                self.message.emit(tr("Placement applied.", "배치를 적용했어요.") if result.get("success") else
+                                  tr("Cannot apply to this window. Select a movable window and try again.", "이 창에 적용할 수 없어요. 이동 가능한 창을 선택하고 다시 시도하세요."), not result.get("success", False))
         self.changed.emit(status)
 
     def apply(self, action):
         target = self.status.get("target")
         if not self.enabled or not target or self.pending:
             return
+        self.submit({"target": target["id"], "action": action})
+
+    def assist_command(self, session, target):
+        if self.enabled and not self.pending:
+            self.submit({"kind": "assist", "session": session, "target": target})
+
+    def submit(self, command):
         self.pending = uuid.uuid4().hex
-        self.bridge.command = {"token": self.pending, "target": target["id"], "action": action}
+        self.bridge.command = dict(command, token=self.pending)
         try:
             self.invoke("app-command")
             self.timeout.start()

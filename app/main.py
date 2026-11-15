@@ -26,6 +26,7 @@ def main():
         from krect.backend import Backend, DesktopBridge, SERVICE
         from krect.window import Window
         from krect.snap import SnapBar
+        from krect.assist import SnapAssist
     except ImportError as error:
         print(f"KRect: {error}. Install python3-dbus and python3-pyqt5 (Plasma 5) or python3-pyqt6 (Plasma 6).", file=sys.stderr)
         return 1
@@ -60,9 +61,14 @@ def main():
         backend = Backend(bridge)
         window = Window(backend, icon)
         snap_bar = SnapBar()
+        snap_assist = SnapAssist()
         bridge.snap_updated.connect(snap_bar.receive)
+        bridge.assist_updated.connect(snap_assist.receive)
+        snap_assist.command.connect(backend.assist_command)
         backend.changed.connect(lambda status: snap_bar.dismiss() if not backend.enabled else None)
+        backend.changed.connect(lambda status: snap_assist.dismiss() if not backend.enabled else None)
         app.aboutToQuit.connect(snap_bar.dismiss)
+        app.aboutToQuit.connect(snap_assist.dismiss)
         bridge.activated.connect(window.activate)
         window.perform(backend.connect_engine)
     except Exception as error:

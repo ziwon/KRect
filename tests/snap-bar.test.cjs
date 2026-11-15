@@ -12,7 +12,8 @@ function desktop({ plasma5 = false, config = {}, app = true, overlayCaption = 'K
         { name: 'wide', geometry: { x: -1920, y: 300, width: 1920, height: 1080 }, area: { x: -1920, y: 340, width: 1920, height: 1040 } },
         { name: 'portrait', geometry: { x: 0, y: 0, width: 1080, height: 1920 }, area: { x: 0, y: 0, width: 1080, height: 1880 } }
     ];
-    const timers = [], updates = [], outlines = [];
+    const timers = [], updates = [], outlines = [], assists = [], commands = [], shortcuts = {}, statuses = [];
+    let clock = 1000;
     const work = { internalId: 'work', managed: true, normalWindow: true, resourceClass: 'editor',
         moveable: true, resizeable: true, moveableAcrossScreens: true, maximizable: true, maximizeMode: 0,
         output: screens[0], screen: 0, frameGeometry: { x: -1700, y: 500, width: 640, height: 480 },
@@ -24,19 +25,31 @@ function desktop({ plasma5 = false, config = {}, app = true, overlayCaption = 'K
     const ws = { screens: plasma5 ? undefined : screens, numScreens: 2, currentDesktop: 1,
         stackingOrder: [work], clientList: () => ws.stackingOrder, activeWindow: work, activeClient: work,
         cursorPos: { x: -1400, y: 510 }, cursorPosChanged: signal(), windowAdded: signal(), windowRemoved: signal(),
-        currentDesktopChanged: signal(), screensChanged: signal(),
+        currentDesktopChanged: signal(), screensChanged: signal(), windowActivated: signal(),
         clientArea(kind, output) { return { ...(typeof output === 'number' ? screens[output] : output)[kind === 1 ? 'geometry' : 'area'] }; },
         sendClientToScreen(w, output) { w.output = typeof output === 'number' ? screens[output] : output; w.screen = screens.indexOf(w.output); },
         showOutline(x, y, width, height) { outlines.push({ x, y, width, height }); }, hideOutline() { outlines.push(null); } };
-    let overlay;
+    let overlay, chooser;
     const controller = api.start({ workspace: ws, KWin: { MaximizeArea: 0, ScreenArea: 1 },
+        now: () => clock,
         readConfig: (k, fallback) => k in config ? config[k] : fallback,
-        registerShortcut() {},
+        registerShortcut(id, name, key, fn) { shortcuts[id] = fn; },
         createTimer() {
             const timer = { timeout: signal(), running: false, start() { this.running = true; }, stop() { this.running = false; } };
             timers.push(timer); return timer;
         },
         callDBus(service, path, iface, method, raw) {
+            if (method === 'Update') { statuses.push(JSON.parse(raw)); return; }
+            if (method === 'TakeCommand') { raw(JSON.stringify(commands.shift() || {})); return; }
+            if (method === 'AssistUpdate') {
+                const model = JSON.parse(raw); assists.push(model);
+                if (model.visible && app && !chooser) {
+                    chooser = { internalId: 'chooser', resourceClass: 'krect', caption: 'KRect Fill Space — KRect',
+                        frameGeometry: { x: 0, y: 0, width: 400, height: 400 } };
+                    ws.windowAdded.emit(chooser);
+                }
+                return;
+            }
             if (method !== 'SnapUpdate') return;
             const model = JSON.parse(raw); updates.push(model);
             if (model.visible && app && !overlay) {
@@ -69,7 +82,19 @@ function desktop({ plasma5 = false, config = {}, app = true, overlayCaption = 'K
         if (timers[1].running) timers[1].timeout.emit();
     }
     const initial = { ...work.frameGeometry };
-    return { ws, work, controller, screens, timers, updates, outlines, initial, pointer, begin, move, open, hover, finish, config };
+    function addWindow(id, extra = {}) {
+        const w = { ...work, internalId: id, caption: id, resourceClass: id, move: false,
+            frameGeometry: { ...initial }, frameGeometryChanged: signal(), ...extra };
+        Object.assign(w, plasma5 ? { clientStartUserMovedResized: signal(), clientStepUserMovedResized: signal(), clientFinishUserMovedResized: signal() } :
+            { interactiveMoveResizeStarted: signal(), interactiveMoveResizeStepped: signal(), interactiveMoveResizeFinished: signal() });
+        ws.stackingOrder.push(w); ws.windowAdded.emit(w); return w;
+    }
+    function choose(target, session = assists.at(-1).session) {
+        commands.push({ kind: 'assist', session, target, token: 'choice' }); shortcuts['KRect-app-command']();
+    }
+    function tick(ms = 200) { clock += ms; if (timers[2].running) timers[2].timeout.emit(); }
+    return { ws, work, controller, screens, timers, updates, outlines, initial, pointer, begin, move, open, hover, finish, config,
+        assists, addWindow, choose, tick, statuses, chooser: () => chooser };
 }
 
 for (const plasma5 of [false, true]) {
@@ -203,4 +228,150 @@ test('small displays do not render unusable layouts; fractional and negative coo
         assert.ok(cell.rect.x + cell.rect.width <= layout.geometry.width);
         assert.ok(cell.rect.y + cell.rect.height <= layout.geometry.height);
     }
+});
+
+for (const plasma5 of [false, true]) {
+    test(`Plasma ${plasma5 ? 5 : 6}: half drop suggests a second window, places it once, and restores both originals`, () => {
+        for (const [action, complement] of [['left', 'right'], ['right', 'left'], ['top', 'bottom'], ['bottom', 'top']]) {
+            const h = desktop({ plasma5 }), other = h.addWindow('browser');
+            const original = { ...other.frameGeometry };
+            h.begin(); h.hover(action); h.finish();
+            const model = h.assists.at(-1);
+            assert.equal(model.visible, true); assert.equal(model.action, complement);
+            assert.deepEqual(model.candidates.map(w => w.id), ['browser']);
+            assert.equal(h.ws.activeWindow === h.chooser() || h.ws.activeClient === h.chooser(), true);
+            h.choose('browser');
+            assert.deepEqual(other.frameGeometry, api.zone(h.screens[0].area, api.fractions(complement, 0, false), 8));
+            assert.equal(h.assists.at(-1).visible, false);
+            h.controller.execute('restore', other); assert.deepEqual(other.frameGeometry, original);
+            h.choose('browser', model.session); assert.deepEqual(other.frameGeometry, original, 'old choice cannot move it again');
+            h.controller.execute('restore', h.work); assert.deepEqual(h.work.frameGeometry, h.initial);
+        }
+    });
+}
+
+test('assist filters excluded, minimized, dialog, other-context and other-monitor windows', () => {
+    for (const plasma5 of [false, true]) {
+        const h = desktop({ plasma5, config: { IgnoredApplications: 'ignored' } });
+        h.ws.currentActivity = 'work';
+        const cases = [{ minimized: true }, { resourceClass: 'ignored' }, { resourceClass: 'krect' },
+            { dialog: true }, { normalWindow: false }, { fullScreen: true }, { resizeable: false },
+            { desktops: [2], desktop: 2 }, { activities: ['away'] }, { output: h.screens[1], screen: 1 },
+            { minSize: { width: 1200, height: 200 } }, { maxSize: { width: 800, height: 900 } }];
+        cases.forEach((c, i) => h.addWindow(`excluded-${i}`, c));
+        h.addWindow('eligible');
+        h.begin(); h.hover('left'); h.finish();
+        assert.deepEqual(h.assists.at(-1).candidates.map(w => w.id), ['eligible']);
+    }
+});
+
+test('no assist for shortcuts, thirds, no candidates, an occupied half, small regions or the disabled preference', () => {
+    for (const scenario of ['shortcut', 'third', 'empty', 'occupied', 'small', 'disabled']) {
+        const h = desktop({ config: { SnapAssist: scenario !== 'disabled' } });
+        if (scenario === 'small') h.screens[0].area.height = 300;
+        if (scenario !== 'empty') h.addWindow('browser', scenario === 'occupied' ?
+            { frameGeometry: api.zone(h.screens[0].area, [.5, 0, .5, 1], 8) } : {});
+        if (scenario === 'shortcut') h.controller.execute('left');
+        else { h.begin(); h.hover(scenario === 'third' ? 'first-third' : 'left'); h.finish(); }
+        assert.equal(h.assists.some(m => m.visible), false, scenario);
+    }
+});
+
+test('skip leaves both frames alone and returns focus to the first window', () => {
+    const h = desktop(), other = h.addWindow('browser');
+    h.begin(); h.hover('left'); h.finish();
+    const first = { ...h.work.frameGeometry }, second = { ...other.frameGeometry };
+    h.choose('');
+    assert.deepEqual(h.work.frameGeometry, first); assert.deepEqual(other.frameGeometry, second);
+    assert.equal(h.ws.activeWindow, h.work);
+    assert.equal(h.assists.at(-1).visible, false);
+});
+
+test('closed or changed candidates are revalidated at selection time', () => {
+    for (const change of [w => { w.minimized = true; }, w => { w.deleted = true; },
+        w => { w.desktops = [2]; }, w => { w.resizeable = false; }, w => { w.minSize = { width: 1200, height: 100 }; }]) {
+        const h = desktop(), other = h.addWindow('browser'); h.addWindow('remaining');
+        h.begin(); h.hover('left'); h.finish();
+        const original = { ...other.frameGeometry }; change(other); h.choose('browser');
+        assert.deepEqual(other.frameGeometry, original);
+        assert.deepEqual(h.assists.at(-1).candidates.map(w => w.id), ['remaining']);
+    }
+});
+
+test('context, focus, source geometry and settings changes invalidate the suggestion', () => {
+    for (const change of [h => h.ws.currentDesktopChanged.emit(), h => h.ws.screensChanged.emit(),
+        h => h.ws.windowRemoved.emit(h.work), h => { h.work.frameGeometry.x += 20; },
+        h => { h.config.SnapAssist = false; }, h => { h.screens[0].area.y += 10; },
+        h => { const w = h.addWindow('outside'); h.ws.activeWindow = w; h.ws.windowActivated.emit(w); }]) {
+        const h = desktop(), other = h.addWindow('browser');
+        h.begin(); h.hover('left'); h.finish(); const session = h.assists.at(-1).session;
+        const original = { ...other.frameGeometry }; change(h); h.tick(); h.choose('browser', session);
+        assert.deepEqual(other.frameGeometry, original); assert.equal(h.assists.at(-1).visible, false);
+    }
+});
+
+test('hiding the chooser before its asynchronous command does not lose the selection', () => {
+    const h = desktop(), other = h.addWindow('browser');
+    h.begin(); h.hover('left'); h.finish(); const session = h.assists.at(-1).session;
+    h.ws.windowRemoved.emit(h.chooser()); h.ws.activeWindow = h.work;
+    h.choose('browser', session);
+    assert.deepEqual(other.frameGeometry, api.zone(h.screens[0].area, [.5, 0, .5, 1], 8));
+});
+
+test('unacknowledged or constrained first frames cannot offer an overlapping second window', () => {
+    for (const acknowledge of [true, false]) {
+        const h = desktop(); h.addWindow('browser');
+        h.begin(); h.hover('left');
+        let actual = { ...h.work.frameGeometry }, requested;
+        Object.defineProperty(h.work, 'frameGeometry', { get: () => actual, set: value => { requested = value; } });
+        h.finish(); assert.equal(h.assists.some(m => m.visible), false);
+        if (acknowledge) actual = requested;
+        h.tick(1100);
+        assert.equal(h.assists.some(m => m.visible), acknowledge);
+    }
+});
+
+test('candidate minimum size includes decoration extents', () => {
+    const h = desktop();
+    h.addWindow('border-too-wide', { minSize: { width: 940, height: 100 },
+        clientGeometry: { x: 0, y: 0, width: 620, height: 440 } });
+    h.begin(); h.hover('left'); h.finish();
+    assert.equal(h.assists.some(m => m.visible), false);
+});
+
+test('second-window placement waits for acceptance; refusal rolls back without changing the first window', () => {
+    for (const acknowledge of [true, false]) {
+        const h = desktop(), other = h.addWindow('browser', { frameGeometry: { ...h.initial, width: 1200 } });
+        h.begin(); h.hover('left'); h.finish();
+        const first = { ...h.work.frameGeometry }, before = { ...other.frameGeometry };
+        let actual = { ...before }, requested;
+        Object.defineProperty(other, 'frameGeometry', { get: () => actual, set: value => {
+            requested = value;
+            if (!acknowledge) actual = { ...value, width: Math.max(1200, value.width) };
+        } });
+        h.choose('browser');
+        assert.equal(h.statuses.some(s => s.result?.token === 'choice'), false, 'do not report success before acceptance');
+        if (acknowledge) actual = requested;
+        h.tick(1100);
+        assert.equal(h.statuses.at(-1).result.success, acknowledge);
+        assert.deepEqual(h.work.frameGeometry, first);
+        if (!acknowledge) {
+            assert.deepEqual(other.frameGeometry, before);
+            assert.equal(h.controller.execute('restore', other), false, 'failed placement adds no restore state');
+        }
+    }
+});
+
+test('switching tasks during a delayed second placement never steals focus back', () => {
+    const h = desktop(), other = h.addWindow('browser');
+    h.begin(); h.hover('left'); h.finish();
+    const before = { ...other.frameGeometry };
+    Object.defineProperty(other, 'frameGeometry', { get: () => before, set() {} });
+    h.choose('browser');
+    const outside = h.addWindow('another-task');
+    h.ws.activeWindow = outside; h.ws.windowActivated.emit(outside);
+    h.tick(1100);
+    assert.equal(h.ws.activeWindow, outside);
+    assert.equal(h.statuses.filter(s => s.result?.token === 'choice').at(-1).result.success, false);
+    assert.deepEqual(other.frameGeometry, before);
 });

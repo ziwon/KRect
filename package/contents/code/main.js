@@ -155,6 +155,9 @@
         var snapTimer = env.createTimer && env.callDBus ? env.createTimer() : null;
         var dropTimer = snapTimer ? env.createTimer() : null;
         var pendingDrop = null;
+        var assist = null, assistWindow = null, assistSerial = 0;
+        var pairPlacement = null;
+        var assistTimer = snapTimer ? env.createTimer() : null;
 
         function ownWindow(w) {
             return w && [w.resourceClass, w.resourceName, w.desktopFileName].some(function (value) {
@@ -179,7 +182,7 @@
             if (!env.callDBus) { return; }
             var w = appTarget();
             var output = w ? screenFor(w) : null;
-            var status = { protocol: 1, version: "0.3.1", snapBar: 1, target: w ? {
+            var status = { protocol: 1, version: "0.3.1", snapBar: 1, snapAssist: 1, target: w ? {
                 id: id(w), caption: String(w.caption || w.resourceClass || "Window"),
                 application: String(w.desktopFileName || w.resourceClass || ""),
                 geometry: rect(w.frameGeometry), area: areaFor(output, w), screen: name(output),
@@ -192,6 +195,10 @@
         }
 
         function activated(w) {
+            if (pairPlacement && w && w !== pairPlacement.window && w !== pairPlacement.source && w !== assistWindow) {
+                cancelPair(true);
+            }
+            if (assist && w && w !== assist.source && w !== assistWindow) { cancelAssist(false); }
             if (ownWindow(w)) { publish(); return; }
             if (w && (w.normalWindow || w.dialog)) { lastWindow = eligible(w, settings()) ? w : null; }
             publish();
@@ -203,6 +210,11 @@
                 try {
                     var command = JSON.parse(String(raw || "{}"));
                     if (!command.token) { publish(); return; }
+                    if (command.kind === "assist") {
+                        var accepted = assistCommand(command);
+                        if (accepted !== null) { publish({ token: command.token, success: accepted, quiet: !command.target }); }
+                        return;
+                    }
                     var w = appTarget();
                     var known = ACTIONS.some(function (a) { return a[0] === command.action; });
                     var success = Boolean(known && w && id(w) === command.target && safeExecute(command.action, w));
@@ -218,6 +230,7 @@
                 timeout: bounded(cfg("CycleTimeout", 1200), 1200, 200, 5000),
                 portrait: boolean(cfg("PortraitThirds", true)),
                 snapBar: boolean(cfg("SnapBar", true)),
+                snapAssist: boolean(cfg("SnapAssist", true)),
                 ignored: String(cfg("IgnoredApplications", "")).toLowerCase().split(/[,;\n]/).map(function (s) { return s.trim(); }).filter(Boolean)
             };
         }
@@ -274,6 +287,155 @@
             for (var i = 0; i < screens.length; i++) {
                 if (name(screens[i]) === outputName) { return screens[i]; }
             }
+            return null;
+        }
+
+        function sendAssist(payload) {
+            if (env.callDBus) {
+                env.callDBus("org.krect.KRect", "/KRect", "org.krect.KRect", "AssistUpdate", JSON.stringify(payload));
+            }
+        }
+
+        function cancelAssist(restoreFocus) {
+            if (!assist) { return; }
+            var source = assist.source;
+            assist = null;
+            assistTimer.stop();
+            if (restoreFocus && (plasma5 ? ws.activeClient : ws.activeWindow) === assistWindow &&
+                    tracked[id(source)] && currentContext(source) && eligible(source, settings())) {
+                if (plasma5) { ws.activeClient = source; } else { ws.activeWindow = source; }
+            }
+            sendAssist({ visible: false });
+        }
+
+        function positionAssist() {
+            if (!assist || !assist.ready || !assistWindow || assistWindow.deleted) { return; }
+            assistWindow.keepAbove = true; assistWindow.skipTaskbar = true; assistWindow.skipPager = true;
+            assistWindow.noBorder = true;
+            if (!near(assistWindow.frameGeometry, assist.popup, 1)) { assistWindow.frameGeometry = rect(assist.popup); }
+            if (!assist.focused) {
+                assist.focused = true;
+                if (plasma5) { ws.activeClient = assistWindow; } else { ws.activeWindow = assistWindow; }
+            }
+        }
+
+        function assistCandidates(s, opts) {
+            return Array.prototype.slice.call(plasma5 ? ws.clientList() : (ws.stackingOrder || [])).reverse().filter(function (w) {
+                return w !== s.source && w.normalWindow && !w.dialog && tracked[id(w)] &&
+                    currentContext(w) && eligible(w, opts) && name(screenFor(w)) === s.output && fitsAssist(w, s.target);
+            });
+        }
+
+        function fitsAssist(w, target) {
+            var client = valid(w.clientGeometry) ? w.clientGeometry : w.frameGeometry;
+            return ["width", "height"].every(function (dimension) {
+                var border = Math.max(0, w.frameGeometry[dimension] - client[dimension]);
+                var size = target[dimension] - border;
+                var min = w.minSize && w.minSize[dimension], max = w.maxSize && w.maxSize[dimension];
+                return !(typeof min === "number" && isFinite(min) && min > size) &&
+                    !(typeof max === "number" && isFinite(max) && max > 0 && max < size);
+            });
+        }
+
+        function cancelPair(rollback) {
+            if (!pairPlacement) { return; }
+            var p = pairPlacement; pairPlacement = null;
+            assistTimer.stop();
+            var output = findScreen(p.output), area = output && areaFor(output, p.window);
+            if (rollback && tracked[id(p.window)] && currentContext(p.window) && eligible(p.window, settings()) &&
+                    area && near(area, p.area, 0)) {
+                place(p.window, p.before, output);
+                if (p.mode) { p.window.setMaximize(Boolean(p.mode & 1), Boolean(p.mode & 2)); }
+            }
+            publish({ token: p.token, success: false });
+        }
+
+        function checkPair() {
+            if (!pairPlacement) { return; }
+            var p = pairPlacement, w = p.window, output = findScreen(p.output);
+            var area = output && areaFor(output, w), opts = settings();
+            var active = plasma5 ? ws.activeClient : ws.activeWindow;
+            if (!tracked[id(w)] || !tracked[id(p.source)] || !currentContext(w) || !currentContext(p.source) ||
+                    !eligible(w, opts) || !eligible(p.source, opts) || !area || !near(area, p.area, 0) ||
+                    !near(p.source.frameGeometry, p.placed, 2) || !fitsAssist(w, p.target) ||
+                    (active && active !== w && active !== p.source && active !== assistWindow)) {
+                cancelPair(true); return;
+            }
+            if (!near(w.frameGeometry, p.target, 2)) {
+                if (now() - p.created >= 1000) { cancelPair(true); }
+                return;
+            }
+            pairPlacement = null; assistTimer.stop();
+            states[id(w)] = p.state;
+            remember(p.state, p.action, 0, p.target, p.before, output, area);
+            if (plasma5) { ws.activeClient = w; } else { ws.activeWindow = w; }
+            lastWindow = w;
+            publish({ token: p.token, success: true });
+        }
+
+        function updateAssist() {
+            if (!assist) { return; }
+            var s = assist, opts = settings(), output = findScreen(s.output);
+            var area = output && areaFor(output, s.source);
+            var active = plasma5 ? ws.activeClient : ws.activeWindow;
+            if (!opts.snapBar || !opts.snapAssist || !tracked[id(s.source)] || !currentContext(s.source) ||
+                    !eligible(s.source, opts) || !area || !near(area, s.area, 0) ||
+                    (active && active !== s.source && active !== assistWindow)) {
+                cancelAssist(false); return;
+            }
+            if (s.closedAt !== undefined && now() - s.closedAt > 1000) { cancelAssist(true); return; }
+            // Wait for the real frame (Wayland configure/ack and client size hints).
+            if (name(screenFor(s.source)) !== s.output || !near(s.source.frameGeometry, s.placed, 2)) {
+                if (s.ready || now() - s.created >= 1000) { cancelAssist(true); }
+                return;
+            }
+            var candidates = assistCandidates(s, opts);
+            if (!candidates.length || candidates.some(function (w) { return near(w.frameGeometry, s.target, 2); })) {
+                cancelAssist(true); return;
+            }
+            s.ready = true;
+            s.candidates = candidates.slice(0, 50);
+            sendAssist({ visible: true, session: s.session, action: s.action, geometry: s.popup,
+                candidates: s.candidates.map(function (w) {
+                    return { id: id(w), caption: String(w.caption || w.resourceClass || "Window").slice(0, 300),
+                        application: String(w.desktopFileName || w.resourceClass || "").slice(0, 200) };
+                }) });
+            positionAssist();
+        }
+
+        function offerAssist(w, action, placed, output, area, opts) {
+            cancelAssist(false);
+            var opposite = { left: "right", right: "left", top: "bottom", bottom: "top" }[action];
+            if (!assistTimer || !opts.snapAssist || !opposite) { return; }
+            var target = zone(area, fractions(opposite, 0, false), opts.gap);
+            if (target.width < 360 || target.height < 320) { return; }
+            var width = Math.min(480, target.width - 32), height = Math.min(400, target.height - 32);
+            assist = { source: w, session: String(now()) + ":" + (++assistSerial), created: now(),
+                placed: rect(placed), output: name(output), area: rect(area), action: opposite,
+                target: target, ready: false, focused: false, candidates: [],
+                popup: { x: Math.round(target.x + (target.width - width) / 2),
+                    y: Math.round(target.y + (target.height - height) / 2), width: width, height: height } };
+            assistTimer.start(); updateAssist();
+        }
+
+        function assistCommand(command) {
+            var s = assist;
+            if (!s || command.session !== s.session) { return false; }
+            if (!command.target) { cancelAssist(true); return true; }
+            updateAssist();
+            if (assist !== s || !s.ready) { return false; }
+            var w = s.candidates.filter(function (candidate) { return id(candidate) === command.target; })[0];
+            if (!w) { return false; }
+            var output = findScreen(s.output), area = areaFor(output, w);
+            if (!area || !near(area, s.area, 0)) { cancelAssist(true); return false; }
+            cancelAssist(false);
+            var before = rect(w.frameGeometry), mode = maxMode(w);
+            var state = states[id(w)] || { original: { geometry: before, area: rect(area), output: name(output), mode: mode }, last: null };
+            pairPlacement = { window: w, source: s.source, placed: s.placed, target: s.target, before: before,
+                output: s.output, area: area, state: state, action: s.action, mode: mode, token: command.token, created: now() };
+            assistTimer.start();
+            place(w, s.target, output);
+            checkPair();
             return null;
         }
 
@@ -356,6 +518,8 @@
         }
 
         function beginDrag(w) {
+            cancelPair(false);
+            cancelAssist(false);
             cancelDrag();
             var opts = settings(), area = areaFor(screenFor(w), w);
             if (!snapTimer || !opts.snapBar || !w.move || !area || !currentContext(w) || !eligible(w, opts, true)) { return; }
@@ -398,6 +562,7 @@
             states[id(w)] = state;
             place(w, target, output);
             remember(state, pending.action, 0, target, before, output, area);
+            offerAssist(w, pending.action, target, output, area, opts);
             publish();
         }
 
@@ -408,6 +573,11 @@
             dropTimer.timeout.connect(function () {
                 try { applyDrop(); } catch (error) { log("Snap drop failed: " + String(error)); }
             });
+            assistTimer.interval = 200;
+            assistTimer.timeout.connect(function () {
+                try { checkPair(); updateAssist(); }
+                catch (error) { log("Snap assist failed: " + String(error)); cancelPair(true); cancelAssist(true); }
+            });
         }
 
         function watch(w) {
@@ -417,6 +587,11 @@
                 idleGeometry: valid(w.frameGeometry) ? rect(w.frameGeometry) : null };
             // Qt appends the application display name to native window titles.
             if (ownWindow(w) && /^KRect Snap Bar(?: — KRect)?$/.test(String(w.caption))) { overlay = w; positionOverlay(); }
+            if (ownWindow(w) && /^KRect Fill Space(?: — KRect)?$/.test(String(w.caption))) {
+                assistWindow = w;
+                if (assist) { delete assist.closedAt; }
+                positionAssist();
+            }
             if (w.frameGeometryChanged && env.callDBus) {
                 w.frameGeometryChanged.connect(function () {
                     if (tracked[key] && !w.move && !w.resize) { tracked[key].idleGeometry = rect(w.frameGeometry); }
@@ -578,6 +753,8 @@
         }
 
         function safeExecute(action, w) {
+            cancelPair(true);
+            cancelAssist(true);
             try { var result = execute(action, w); publish(); return result; }
             catch (error) { log(action + " failed: " + String(error)); return false; }
         }
@@ -586,8 +763,13 @@
         var added = ws.windowAdded || ws.clientAdded;
         if (removed) {
             removed.connect(function (w) {
+                if (pairPlacement && (pairPlacement.window === w || pairPlacement.source === w)) { cancelPair(pairPlacement.source === w); }
                 if ((drag && drag.window === w) || (pendingDrop && pendingDrop.drag.window === w)) { cancelDrag(); }
                 if (overlay === w) { overlay = null; if (drag) { hideSnap(); } }
+                if (assist && assist.source === w) { cancelAssist(false); }
+                // The chooser hides before its asynchronous D-Bus selection arrives.
+                if (assist && assistWindow === w) { assist.closedAt = now(); }
+                if (assistWindow === w) { assistWindow = null; }
                 delete states[id(w)]; delete tracked[id(w)];
                 if (lastWindow === w) { lastWindow = null; publish(); }
             });
@@ -602,7 +784,7 @@
         var activation = ws.windowActivated || ws.clientActivated;
         if (activation) { activation.connect(activated); }
         [ws.currentDesktopChanged, ws.currentActivityChanged, ws.screensChanged, ws.numberScreensChanged].forEach(function (signal) {
-            if (signal && env.callDBus) { signal.connect(function () { cancelDrag(); publish(); }); }
+            if (signal && env.callDBus) { signal.connect(function () { cancelDrag(); cancelPair(true); cancelAssist(false); publish(); }); }
         });
         if (ws.cursorPosChanged && snapTimer) { ws.cursorPosChanged.connect(updateDrag); }
         activated(plasma5 ? ws.activeClient : ws.activeWindow);

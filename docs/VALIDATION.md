@@ -3,6 +3,120 @@
 Date: 2026-11-15. Release: 0.3.1 snap bar visibility and stacking fixes.
 Older release sections below retain their historical results and limitations.
 
+## Second-window suggestions — unreleased
+
+The development build offers a native chooser after dragging a window into a
+left/right/top/bottom half. The engine supplies eligible candidates from the same
+monitor, desktop and activity, waits for the first window's accepted frame, and
+validates the session, source, work area and candidate again when selected. Candidate
+minimum/maximum client sizes include current decoration extents; incompatible
+windows are excluded. The second placement waits for the accepted frame before
+reporting success, and rolls back on refusal without changing the first placement.
+The size properties follow the [KWin scripting API](https://develop.kde.org/docs/plasma/kwin/api/).
+Click
+or Enter places the second window; Esc, Skip or an outside focus change dismisses
+the chooser. Each window retains its own restore state. Shortcuts, thirds and
+quarters do not trigger it. The preference is `SnapAssist`; small destination
+regions (less than 360 × 320 compositor coordinates), no candidates and an already
+occupied matching half suppress the chooser.
+
+Observed checks on 2026-11-15:
+
+- **100 automated tests** passed without skips: 73 Node and 27 Python. These cover
+  both mocked Plasma APIs, all four half directions, stale/closed candidates,
+  context and geometry changes, delayed frame acknowledgements, restoring both
+  windows, Qt mouse/keyboard input, dismissal, heartbeat replay and malformed
+  D-Bus payloads, declared client sizes with borders, refused placement rollback
+  task switching during delayed placement and desktop-file icon resolution. The Debian tests build/extract Ubuntu 24.04 and 26.04 packages,
+  verify dependency selection and payloads, and confirm Capture is absent.
+- Korean and English Qt 5 application/About construction checks passed. The
+  offscreen backend emitted its usual size-hint/tray/raise warnings and exited 0.
+- **Four Plasma 5.27/X11 live scenarios** passed using
+  `/usr/bin/python3 -B tools/validate_snap_x11.py --assist`: native click with
+  target focus and both original-frame restores, Enter selection, Esc preserving
+  the first placement and focus, and outside-click dismissal. The harness used
+  disposable windows and restricted its candidate list to them. It checked actual
+  chooser mapping, frame coordinates and focus; a native `QScreen.grabWindow`
+  image is in ignored `dist/snap-validation/assist-native.png`, with results in
+  `assist-results.json`.
+- The existing snapfix3 app was paused for isolation and its engine restored
+  afterward. A final D-Bus check confirmed the original engine is loaded and the
+  validation engine is unloaded. No new package was installed.
+
+The first new mock tests accidentally shared move signals across synthetic
+windows; independent signals fixed those failures. The initial live harness
+attempt stopped before exercising the feature because of an argument-variable
+collision and malformed generated JavaScript. Its restore helper also selected
+the wrong D-Bus overload; the original engine/app were recovered immediately.
+The helper now uses an explicit `ss` signature, and generated JavaScript is
+syntax-checked before loading. The subsequent four-scenario live run passed and
+its automatic restore completed successfully. A compact widget inspection found
+that 248 × 188 was below Qt's minimum usable height; the engine's small-region
+gate was raised, and 328 × 288 and 480 × 400 renders fit.
+
+Still pending: real Plasma 6/Wayland, Qt 6 construction for this new chooser,
+mixed scale/hotplug and unusually large UI fonts or restrictive candidate size
+hints. Node mocks and Qt 5 widget checks do not establish those environments.
+This is development source, not part of the published 0.3.1 release.
+
+## About — unreleased
+
+The development app has an About dialog accessible from the footer and the tray.
+Its selectable version comes from `krect.VERSION`, the same source as the CLI,
+application metadata and footer. It includes website, source and license links,
+with Korean and English labels. This change is planned for the next window-management release and
+is not part of the published 0.3.1 package.
+
+The Qt 5 offscreen construction check passed in both languages:
+`QT_QPA_PLATFORM=offscreen /usr/bin/python3 -B app/main.py --smoke-test --language ko`
+and the equivalent `--language en`. It renders the application tabs, opens About from the
+footer, verifies its version against application metadata, closes it with its
+button, and reopens it from the tray while the main window stays hidden. Repeated
+tray commands reuse the dialog. Five existing capture tests also pass without skips.
+Widget previews are saved in ignored `dist/about-validation/`; the Korean dialog
+and English Capture tab with the new footer button were visually checked.
+
+The offscreen backend emits its known tray-signal, size-hint and raise warnings;
+the checks exit successfully. These are widget checks, not proof of compositor
+stacking or live capture. Qt 6 is not installed in the local Python environment,
+so this About change has not yet been checked on Qt 6 or a live Wayland session.
+The installed app and running KWin engine were not replaced.
+
+## Native capture — unreleased prototype
+
+**Shelved:** the prototype and its five tests now live in `experiments/capture/`.
+The application, tray and Debian packages no longer include Capture. The notes
+below record the earlier experiment, not a supported feature.
+
+The prototype included a Capture tab and tray commands for interactive
+window/display selection, a native region overlay, preview, clipboard copy and PNG
+save. It uses KWin's `org.kde.KWin.ScreenShot2.CaptureInteractive` interface, present
+on this Plasma 5.27 session and in the inspected Plasma 5.27/6.0 upstream sources.
+No Spectacle process or dependency is used. Interactive selection uses the user's
+click; the shared Python interpreter is not granted a restricted screenshot interface.
+
+Five targeted Qt 5 tests pass: raw pixel decoding and truncated transfers; invalid
+or oversized frames; scaled/reversed region crops; cancellation/error preserving
+the previous image; original-resolution clipboard and atomic PNG output. The Qt 5
+application construction check passes with all four tabs.
+
+**Live capture is not validated.** In this desktop session, KWin returned its
+`Cancelled` error before an automated selection could occur. Moving from a full-screen
+test window to a normal window, increasing the input delay, enabling the test X11
+connection during server grabs, and sending Escape did not resolve it. Independent
+X11 probes reported `AlreadyGrabbed` for both pointer and keyboard with no mouse
+button held. This persisted after the installed KRect app was stopped. The input
+grab owner is not identified; do not treat these runs as successful captures or as
+proof that the implementation is otherwise correct. Native computer-tool keyboard
+input was also unavailable because `ydotool` is absent; the isolated X11 test path
+was used instead. The installed 0.3.0 package has not been replaced by this prototype.
+
+Further work: identify/release the session input grab, verify real window/display
+pixels and region selection/cancellation, and test Qt 6 / Plasma 6 Wayland,
+mixed scaling and monitor removal. Capture is currently per display rather than a
+combined multi-monitor image. Tests and preview assets do not establish live capture
+compatibility.
+
 ## Snap bar 0.3.1
 
 Three integration problems caused the 0.3.0 bar to disappear or sit behind the

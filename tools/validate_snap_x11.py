@@ -5,6 +5,7 @@ Uses an isolated KWin script/service, does not register shortcuts or change conf
 and restores the pointer/focus on exit. Run with the distribution Python.
 """
 import ctypes as F
+import argparse
 import ctypes.util
 import json
 import os
@@ -19,6 +20,7 @@ sys.path.insert(0, str(ROOT / "app"))
 from krect.backend import DesktopBridge
 from krect.qt import QtCore as C, QtWidgets as W, QtDBus as D, Slot
 from krect.snap import SnapBar
+from krect.assist import SnapAssist
 import dbus
 
 SERVICE = "org.krect.SnapValidation"
@@ -30,7 +32,10 @@ class Bridge(DesktopBridge):
     def __init__(self):
         super().__init__()
         self.queue, self.replies, self.logs, self.models = [], {}, [], []
+        self.assists, self.statuses = [], []
         self.snap_updated.connect(self.models.append)
+        self.assist_updated.connect(self.assists.append)
+        self.updated.connect(self.statuses.append)
 
     @Slot(result=str)
     def TestTake(self):
@@ -47,6 +52,9 @@ class Bridge(DesktopBridge):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--assist", action="store_true", help="Check the second-window chooser with disposable windows")
+    options = parser.parse_args()
     if os.environ.get("XDG_SESSION_TYPE") != "x11":
         raise SystemExit("This live input harness is for KDE/X11 only.")
     EVIDENCE.mkdir(parents=True, exist_ok=True)
@@ -57,7 +65,9 @@ def main():
     controls = W.QLabel("KRect validation controls — temporary window")
     controls.setWindowTitle("KRect Validation Controls")
     bridge, bar = Bridge(), SnapBar()
+    chooser = SnapAssist()
     bridge.snap_updated.connect(bar.receive)
+    bridge.assist_updated.connect(chooser.receive)
     qtbus = D.QDBusConnection.sessionBus()
     assert qtbus.registerService(SERVICE), "Another validation is running"
     assert qtbus.registerObject("/KRect", SERVICE, bridge, D.QDBusConnection.RegisterOption.ExportAllSlots)
@@ -69,9 +79,22 @@ def main():
     source += '''
 var previous = workspace.activeClient;
 function send(method, value) { callDBus("org.krect.SnapValidation", "/KRect", "org.krect.SnapValidation", method, value); }
-var controller = module.exports.start({ workspace: workspace, KWin: KWin,
-    readConfig: function (key, fallback) { return key === "Gap" ? 8 : fallback; },
-    createTimer: function () { return new QTimer(); }, registerShortcut: function () {},
+// Only test clients can be suggested; production windows are never candidates.
+var isolated = { clientList: function () { return workspace.clientList().filter(function (w) {
+    return /^KRect (Snap Validation Client|Assist Validation Candidate)$/.test(String(w.caption)) || String(w.resourceClass) === "krect";
+}); } };
+["activeClient", "currentDesktop", "currentActivity", "numScreens", "cursorPos"].forEach(function (key) {
+    Object.defineProperty(isolated, key, { get: function () { return workspace[key]; }, set: function (value) { workspace[key] = value; } });
+});
+["clientAdded", "clientRemoved", "clientActivated", "clientMaximizeSet", "numberScreensChanged", "currentDesktopChanged", "currentActivityChanged", "cursorPosChanged"].forEach(function (key) { isolated[key] = workspace[key]; });
+isolated.clientArea = function (kind, output, desktop) { return workspace.clientArea(kind, output, desktop); };
+isolated.sendClientToScreen = function (w, screen) { workspace.sendClientToScreen(w, screen); };
+isolated.showOutline = function (x, y, width, height) { workspace.showOutline(x, y, width, height); };
+isolated.hideOutline = function () { workspace.hideOutline(); };
+var appCommand;
+var controller = module.exports.start({ workspace: isolated, KWin: KWin,
+    readConfig: function (key, fallback) { return key === "Gap" ? 8 : key === "SnapAssist" ? __ASSIST__ : fallback; },
+    createTimer: function () { return new QTimer(); }, registerShortcut: function (name, text, key, fn) { if (name === "KRect-app-command") { appCommand = fn; } },
     callDBus: function (service, path, iface, method, raw) { send(method, raw); },
     log: function (message) { send("TestLog", message); }
 });
@@ -81,9 +104,11 @@ var poll = new QTimer(); poll.interval = 40;
 poll.timeout.connect(function () {
     callDBus("org.krect.SnapValidation", "/KRect", "org.krect.SnapValidation", "TestTake", function (raw) {
         var c = JSON.parse(raw); if (!c.token) { return; }
-        var w = target(), result = { token: c.token };
+        var w = c.other ? workspace.clientList().filter(function (w) { return String(w.caption) === "KRect Assist Validation Candidate"; })[0] : target();
+        var result = { token: c.token };
         try {
             if (c.action === "focus-back") { if (previous && !previous.deleted) { workspace.activeClient = previous; } }
+            else if (c.action === "assist-command") { appCommand(); }
             else {
                 if (!w) { throw new Error("Validation client not found"); }
                 if (c.action === "setup") { w.setMaximize(false, false); w.frameGeometry = c.geometry; workspace.activeClient = w; }
@@ -101,14 +126,19 @@ poll.timeout.connect(function () {
                 }
                 var overlays = workspace.clientList().filter(function (x) { return /^KRect Snap Bar(?: — KRect)?$/.test(String(x.caption)); });
                 result.overlays = overlays.map(function (x) { return { geometry: geometry(x), app: String(x.resourceClass), above: x.keepAbove, windowId: Number(x.windowId) }; });
+                result.choosers = workspace.clientList().filter(function (x) { return /^KRect Fill Space(?: — KRect)?$/.test(String(x.caption)); }).map(function (x) {
+                    return { geometry: geometry(x), active: workspace.activeClient === x, windowId: Number(x.windowId) };
+                });
             }
         } catch (error) { result.error = String(error); }
         send("TestUpdate", JSON.stringify(result));
     });
 }); poll.start();
 '''
+    source = source.replace("__ASSIST__", "true" if options.assist else "false")
     path = EVIDENCE / "engine.js"
     path.write_text(source)
+    subprocess.run(["node", "--check", str(path)], check=True)
     x = F.CDLL(ctypes.util.find_library("X11"))
     xt = F.CDLL(ctypes.util.find_library("Xtst"))
     x.XOpenDisplay.restype = F.c_void_p
@@ -149,16 +179,25 @@ poll.timeout.connect(function () {
         assert "error" not in result, result
         return result
 
+    def assist_command(session, target):
+        bridge.command = dict(kind="assist", session=session, target=target, token=f"assist-{sequence}")
+        command("assist-command")
+
+    chooser.command.connect(assist_command)
+
     def move(px, py):
         xt.XTestFakeMotionEvent(display, -1, round(px), round(py), 0); x.XFlush(display); wait()
 
     def button(pressed):
         xt.XTestFakeButtonEvent(display, 1, int(pressed), 0); x.XFlush(display); wait()
 
-    def escape():
-        code = x.XKeysymToKeycode(display, 0xff1b)
+    def key(keysym):
+        code = x.XKeysymToKeycode(display, keysym)
         xt.XTestFakeKeyEvent(display, code, 1, 0); xt.XTestFakeKeyEvent(display, code, 0, 0)
         x.XFlush(display); wait()
+
+    def escape():
+        key(0xff1b)
 
     initial = None
     landscape_index = None
@@ -207,8 +246,12 @@ from PyQt5 import QtWidgets as W, QtCore as C
 app=W.QApplication(["krect-snap-validation-client"])
 w=W.QLabel("KRect drag validation — temporary window")
 w.setWindowTitle("KRect Snap Validation Client")
-w.resize(700,450);w.show();C.QTimer.singleShot(90000,app.quit);app.exec_()
-'''], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+w.resize(700,450);w.show()
+if len(__import__("sys").argv) > 1:
+    other=W.QLabel("Second disposable window — safe to arrange")
+    other.setWindowTitle("KRect Assist Validation Candidate");other.resize(600,400);other.show()
+C.QTimer.singleShot(180000,app.quit);app.exec_()
+''', *( ["assist"] if options.assist else [])], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         wait(.8)
         screens = command()["screens"]
         landscape_index = next((i for i, a in enumerate(screens) if a["width"] > a["height"]), None)
@@ -217,6 +260,61 @@ w.resize(700,450);w.show();C.QTimer.singleShot(90000,app.quit);app.exec_()
         area = screens[landscape_index]
         initial = dict(x=area["x"]+round(area["width"]/3), y=area["y"]+round(area["height"]/3),
                        width=min(900, area["width"]//2), height=min(600, area["height"]//2))
+        if options.assist:
+            other_initial = dict(initial, x=initial["x"] + 120, y=initial["y"] + 100, width=700, height=450)
+
+            def show_chooser():
+                command("setup", other=True, geometry=other_initial)
+                _, area = begin("left")
+                button(False); wait(.5)
+                state = command()
+                assert chooser.isVisible(), {"state": state, "models": bridge.assists[-2:], "logs": bridge.logs}
+                assert len(state["choosers"]) == 1 and state["choosers"][0]["active"], state
+                model = bridge.assists[-1]
+                assert state["choosers"][0]["geometry"] == model["geometry"], state
+                assert len(model["candidates"]) == 1 and model["candidates"][0]["caption"] == "KRect Assist Validation Candidate", model
+                props = subprocess.check_output(["xprop", "-id", str(state["choosers"][0]["windowId"]), "_NET_WM_STATE"], text=True)
+                assert "_NET_WM_STATE_HIDDEN" not in props, props
+                return area, model
+
+            area, model = show_chooser()
+            app.primaryScreen().grabWindow(int(chooser.winId())).save(str(EVIDENCE / "assist-native.png"))
+            item = chooser.windows.visualItemRect(chooser.windows.item(0)).center()
+            local = chooser.windows.viewport().mapTo(chooser, item)
+            g = model["geometry"]
+            move(g["x"] + local.x() * g["width"] / chooser.width(), g["y"] + local.y() * g["height"] / chooser.height())
+            button(True); button(False); wait(.5)
+            expected = dict(x=round(area["x"]+area["width"]/2+4), y=area["y"]+8,
+                            width=area["x"]+area["width"]-8-round(area["x"]+area["width"]/2+4), height=area["height"]-16)
+            result = command(other=True)
+            assert result["geometry"] == expected and result["active"], (result, expected, bridge.statuses[-3:])
+            assert not chooser.isVisible()
+            command("restore", other=True); wait(); assert command(other=True)["geometry"] == other_initial
+            command("restore"); wait(); assert command()["geometry"] == initial
+            checks.append("native click places the second window, focuses it and restores both originals")
+
+            show_chooser(); key(0xff0d); wait(.4)
+            assert command(other=True)["geometry"] == expected and not chooser.isVisible()
+            command("restore", other=True); command("restore")
+            checks.append("Enter chooses the focused candidate")
+
+            show_chooser(); first = command()["geometry"]
+            escape(); wait(.4)
+            assert not chooser.isVisible() and command()["geometry"] == first
+            assert command(other=True)["geometry"] == other_initial and command()["active"]
+            checks.append("Esc skips without moving either window and returns focus")
+            command("restore")
+
+            show_chooser(); first = command()["geometry"]
+            move(first["x"] + first["width"]/2, first["y"] + 100)
+            button(True); button(False); wait(.4)
+            assert not chooser.isVisible() and command(other=True)["geometry"] == other_initial
+            checks.append("clicking outside skips without placing a candidate")
+            command("restore")
+            assert not bridge.logs, bridge.logs
+            (EVIDENCE / "assist-results.json").write_text(json.dumps(dict(checks=checks, logs=bridge.logs), indent=2)+"\n")
+            print(json.dumps(dict(passed=len(checks), checks=checks), ensure_ascii=False))
+            return
         before, area = begin()
         bar.grab().save(str(EVIDENCE / "bar-landscape.png"))
         button(False); wait(.3)
@@ -283,6 +381,7 @@ w.resize(700,450);w.show();C.QTimer.singleShot(90000,app.quit);app.exec_()
             client.terminate(); client.wait(timeout=5)
         move(*saved_pointer)
         bar.dismiss()
+        chooser.dismiss()
         controls.close()
         x.XCloseDisplay(display)
 

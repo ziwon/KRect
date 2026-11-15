@@ -9,6 +9,7 @@
     <entry name="CycleTimeout" type="Int"><label>Repeat interval in milliseconds</label><default>1200</default><min>200</min><max>5000</max></entry>
     <entry name="PortraitThirds" type="Bool"><label>Use horizontal thirds on portrait screens</label><default>true</default></entry>
     <entry name="SnapBar" type="Bool"><label>Show snap layouts when dragging to the top (requires the KRect app)</label><default>true</default></entry>
+    <entry name="SnapAssist" type="Bool"><label>Suggest a window for the other half after dragging</label><default>true</default></entry>
     <entry name="IgnoredApplications" type="String"><label>Ignored app identifiers, separated by commas</label><default></default></entry>
   </group>
 </kcfg>

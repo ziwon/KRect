@@ -15,6 +15,7 @@
     <item row="4" column="0"><widget class="QLabel" name="ignoreLabel"><property name="text"><string>Ignored apps:</string></property><property name="buddy"><cstring>kcfg_IgnoredApplications</cstring></property></widget></item>
     <item row="4" column="1"><widget class="QLineEdit" name="kcfg_IgnoredApplications"><property name="placeholderText"><string>org.kde.konsole, firefox</string></property></widget></item>
     <item row="5" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_SnapBar"><property name="text"><string>Show layouts when dragging to the top (keep the KRect app running)</string></property></widget></item>
+    <item row="6" column="0" colspan="2"><widget class="QCheckBox" name="kcfg_SnapAssist"><property name="text"><string>Suggest a window for the other half after dragging</string></property></widget></item>
    </layout></item>
    <item><widget class="QLabel" name="help"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Change shortcuts in System Settings → Keyboard → Shortcuts; search for KRect. Conflicting defaults need to be reassigned there.
 

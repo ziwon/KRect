@@ -1,5 +1,6 @@
 """Theme-respecting Qt window and native tray menu."""
 from . import VERSION
+from .about import AboutDialog
 from .model import ACTIONS, LABELS, fraction, tr
 from .qt import Action, QtCore as C, QtGui as G, QtWidgets as W, QT_MAJOR, Signal
 
@@ -152,6 +153,7 @@ class Window(W.QMainWindow):
         self.shortcuts_loaded = False
         self.portrait = None
         self.quitting = False
+        self.about_dialog = None
         central = W.QWidget()
         self.setCentralWidget(central)
         outer = W.QVBoxLayout(central)
@@ -189,6 +191,9 @@ class Window(W.QMainWindow):
         footer.addWidget(text_label(f"KRect {VERSION} · Plasma {backend.major} · " +
                                     ("Wayland" if G.QGuiApplication.platformName().startswith("wayland") else "X11")))
         footer.addStretch()
+        self.about_button = W.QPushButton(tr("About", "앱 정보"))
+        self.about_button.clicked.connect(self.show_about)
+        footer.addWidget(self.about_button)
         quit_button = W.QPushButton(tr("Quit", "종료"))
         quit_button.clicked.connect(self.quit)
         footer.addWidget(quit_button)
@@ -307,6 +312,11 @@ class Window(W.QMainWindow):
         self.snap_bar = W.QCheckBox(tr("Show snap layouts when dragging to the top", "창을 화면 상단으로 끌면 배치 막대 표시"))
         self.snap_bar.setChecked(values["SnapBar"])
         form.addRow(self.snap_bar)
+        self.snap_assist = W.QCheckBox(tr("Suggest a window for the other half after dragging", "반쪽으로 끌어 배치한 뒤 다른 쪽에 놓을 창 추천"))
+        self.snap_assist.setChecked(values["SnapAssist"])
+        self.snap_assist.setEnabled(self.snap_bar.isChecked())
+        self.snap_bar.toggled.connect(self.snap_assist.setEnabled)
+        form.addRow(self.snap_assist)
         box.addLayout(form)
         box.addWidget(text_label(tr("Drag a window to the top center of a display, move into a region, then release. Move away to continue dragging, or press Esc to cancel. Keep KRect running in the tray for this feature.",
                                     "창을 화면 상단 중앙으로 끌고, 막대의 원하는 영역에서 놓으세요. 막대를 벗어나면 일반 드래그로 돌아가고 Esc로 취소할 수 있어요. 이 기능은 KRect가 트레이에서 실행 중일 때 작동해요."), True))
@@ -359,10 +369,19 @@ class Window(W.QMainWindow):
         self.tray_enable = menu.addAction(tr("Enable KRect", "KRect 켜기"))
         self.tray_enable.setCheckable(True)
         self.tray_enable.triggered.connect(self.toggle)
+        self.tray_about = menu.addAction(tr("About KRect…", "KRect 정보…"))
+        self.tray_about.triggered.connect(self.show_about)
         menu.addAction(tr("Quit KRect", "KRect 종료"), self.quit)
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(lambda reason: self.activate() if reason == W.QSystemTrayIcon.ActivationReason.Trigger else None)
         self.tray.show()
+
+    def show_about(self):
+        if self.about_dialog is None:
+            self.about_dialog = AboutDialog(self)
+        self.about_dialog.show()
+        self.about_dialog.raise_()
+        self.about_dialog.activateWindow()
 
     def perform(self, function):
         try:
@@ -458,6 +477,7 @@ class Window(W.QMainWindow):
     def save_preferences(self):
         values = dict(Gap=self.gap.value(), CycleHalves=self.cycle.isChecked(), CycleTimeout=self.cycle_timeout.value(),
                       PortraitThirds=self.portrait_thirds.isChecked(), SnapBar=self.snap_bar.isChecked(),
+                      SnapAssist=self.snap_assist.isChecked(),
                       IgnoredApplications=self.exclusions.toPlainText().strip())
         self.perform(lambda: self.backend.save_settings(values, self.autostart.isChecked(), self.close_tray.isChecked()))
 
